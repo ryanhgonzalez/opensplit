@@ -1,10 +1,10 @@
 .dashboard {
-  padding-top: 8px;
+  padding-top: 0;
 }
 
 /* Header */
 .dashboard-header {
-  padding: 16px 20px 20px;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 20px 20px;
 }
 
 .dashboard-greeting {

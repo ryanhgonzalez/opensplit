@@ -155,7 +155,7 @@ button:focus-visible {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: calc(var(--bottom-nav-height) + 16px);
+  padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 16px);
   scrollbar-width: none;
 }
 
@@ -249,7 +249,7 @@ h4 { font-size: 15px; font-weight: 600; line-height: 1.35; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 28px 20px 16px;
+  padding: calc(28px + env(safe-area-inset-top, 0px)) 20px 16px;
 }
 
 .page-hero-title {
