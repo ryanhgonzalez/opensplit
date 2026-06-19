@@ -1,0 +1,554 @@
+.insights-page {
+  padding-bottom: 24px;
+}
+
+/* ── Controls ─────────────────────────────────────────────────────────────── */
+
+.insights-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.ins-period-tabs,
+.ins-mode-toggle {
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  flex: 1;
+}
+
+.ins-period-tab,
+.ins-mode-btn {
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all var(--transition-base);
+  white-space: nowrap;
+}
+
+.ins-period-tab.active,
+.ins-mode-btn.active {
+  background: var(--glass-bg-strong);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--glass-border);
+}
+
+/* ── Summary stats ────────────────────────────────────────────────────────── */
+
+.ins-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.ins-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 12px;
+  border-radius: var(--radius-lg) !important;
+}
+
+.ins-stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ins-stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.ins-stat-sub {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Charts row (desktop: side-by-side) ───────────────────────────────────── */
+
+.ins-charts-row {
+  display: contents; /* transparent on mobile */
+}
+
+/* ── Donut chart ──────────────────────────────────────────────────────────── */
+
+.donut-svg {
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.ins-donut-layout {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.ins-cat-legend {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ins-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ins-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ins-legend-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.ins-legend-label {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ins-legend-pct {
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ins-legend-amt {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  min-width: 52px;
+  text-align: right;
+}
+
+/* ── Monthly chart ────────────────────────────────────────────────────────── */
+
+.mc-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.mc-chart-area {
+  height: 160px;
+  position: relative;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 6px;
+}
+
+.mc-grid-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.mc-y-label {
+  font-size: 9px;
+  color: var(--text-tertiary);
+  width: 34px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 6px;
+  font-weight: 500;
+}
+
+.mc-grid-line {
+  flex: 1;
+  height: 1px;
+  background: var(--fill-primary);
+}
+
+.mc-bars {
+  position: absolute;
+  inset: 0 0 0 40px;
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  padding: 0 2px;
+}
+
+.mc-bar-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  position: relative;
+  cursor: pointer;
+  border-radius: 3px 3px 0 0;
+  transition: background var(--transition-fast);
+}
+
+.mc-bar-col.hovered {
+  background: var(--fill-tertiary);
+}
+
+.mc-bar-pair {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.mc-bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 0;
+}
+
+.mc-bar-total {
+  background: rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-bottom: none;
+}
+
+.mc-bar-share {
+  background: linear-gradient(to top, rgba(45, 212, 191, 0.65), rgba(45, 212, 191, 0.88));
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.2);
+}
+
+.mc-bar-col.hovered .mc-bar-share {
+  box-shadow: 0 0 14px rgba(45, 212, 191, 0.45);
+}
+
+/* Tooltip — floats inside .mc-chart-area (avoids .glass overflow:hidden clipping) */
+.mc-tooltip {
+  position: absolute;
+  background: rgba(12, 12, 30, 0.92);
+  border: 1px solid var(--glass-border-strong);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 10px;
+  padding: 9px 12px;
+  z-index: 20;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.mc-tooltip-month {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 5px;
+}
+
+.mc-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.mc-tooltip-row strong {
+  color: var(--text-primary);
+  font-weight: 700;
+  margin-left: auto;
+  padding-left: 10px;
+}
+
+.mc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Labels */
+.mc-labels {
+  display: flex;
+  gap: 5px;
+  padding: 0 2px 0 42px;
+}
+
+.mc-label {
+  flex: 1;
+  text-align: center;
+  font-size: 9px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+/* Legend */
+.mc-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.mc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.mc-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+/* Empty state */
+.mc-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+/* ── Group contributions ──────────────────────────────────────────────────── */
+
+.ins-groups-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gc-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.gc-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.gc-name {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.2px;
+  margin-bottom: 2px;
+}
+
+.gc-total {
+  font-size: 12px;
+}
+
+.gc-members {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.gc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gc-identity {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 76px;
+  flex-shrink: 0;
+}
+
+.gc-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-prominent);
+}
+
+.gc-member-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gc-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--fill-primary);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gc-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.8;
+}
+
+.gc-share-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--glass-bg-strong);
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+.gc-amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  width: 58px;
+  flex-shrink: 0;
+}
+
+.gc-paid-amt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.gc-net-amt {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ── Desktop layout ───────────────────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  .insights-page {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 8px;
+  }
+
+  .ins-charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 20px;
+    align-items: stretch;
+  }
+
+  /* Both chart cells grow to fill the grid row height */
+  .ins-chart-category,
+  .ins-chart-monthly {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ins-chart-category .px-5,
+  .ins-chart-monthly .px-5 {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* GlassCard fills the cell */
+  .ins-chart-category .px-5 > .glass,
+  .ins-chart-monthly .px-5 > .glass {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Donut layout fills the card, centering its content vertically */
+  .ins-chart-category .ins-donut-layout {
+    flex: 1;
+    align-items: center;
+  }
+
+  /* Monthly chart internals expand to fill available height */
+  .ins-chart-monthly .mc-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ins-chart-monthly .mc-chart-area {
+    flex: 1;
+    height: auto;
+    min-height: 160px;
+  }
+
+  .ins-stats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+
+  .ins-stat-value {
+    font-size: 22px;
+  }
+
+  /* Group contributions: 2-column grid */
+  .ins-groups-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  /* Donut layout stays horizontal */
+  .ins-donut-layout {
+    flex-wrap: nowrap;
+  }
+
+  /* Wider bar chart */
+  .mc-chart-area {
+    height: 180px;
+  }
+
+  .mc-bars {
+    gap: 8px;
+  }
+}

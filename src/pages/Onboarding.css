@@ -1,0 +1,220 @@
+.ob-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-base);
+  overflow: hidden;
+  padding: 24px;
+}
+
+/* Decorative background orbs */
+.ob-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.ob-orb-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.5) 0%, transparent 70%);
+  top: -220px;
+  right: -160px;
+  filter: blur(60px);
+  animation: ob-float-1 20s ease-in-out infinite;
+}
+
+.ob-orb-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.4) 0%, transparent 70%);
+  bottom: -180px;
+  left: -120px;
+  filter: blur(60px);
+  animation: ob-float-2 16s ease-in-out infinite;
+}
+
+@keyframes ob-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-30px, 40px) scale(1.05); }
+}
+
+@keyframes ob-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, -30px) scale(1.08); }
+}
+
+/* Card */
+.ob-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 32px;
+  padding: 40px 36px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Logo */
+.ob-logo-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.ob-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.5), rgba(14, 165, 233, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.3);
+}
+
+/* Heading */
+.ob-heading {
+  text-align: center;
+}
+
+.ob-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  margin-bottom: 8px;
+}
+
+.ob-subtitle {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Features */
+.ob-features {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ob-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--fill-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+}
+
+.ob-feature-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ob-feature-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+
+.ob-feature-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* Form */
+.ob-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ob-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+}
+
+.ob-input {
+  width: 100%;
+  background: var(--fill-primary);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 14px;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 16px;
+  padding: 14px 16px;
+  outline: none;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.ob-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.ob-input:focus {
+  border-color: rgba(124, 58, 237, 0.7);
+  background: var(--fill-hover);
+}
+
+.ob-cta {
+  width: 100%;
+  padding: 15px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 150ms ease, transform 150ms ease;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.45);
+  margin-top: 4px;
+}
+
+.ob-cta:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ob-cta:not(:disabled):hover {
+  opacity: 0.9;
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .ob-card {
+    padding: 32px 24px;
+    border-radius: 28px;
+    gap: 24px;
+  }
+
+  .ob-title {
+    font-size: 24px;
+  }
+
+  .ob-logo {
+    width: 64px;
+    height: 64px;
+    font-size: 30px;
+  }
+}

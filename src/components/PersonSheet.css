@@ -1,0 +1,171 @@
+.ps-panel {
+  max-height: 88vh;
+}
+
+.ps-avatar-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 20px;
+}
+
+.ps-balance-chip {
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ps-balance-chip.green {
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  color: var(--accent-green);
+}
+
+.ps-balance-chip.red {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: var(--accent-red);
+}
+
+.ps-balance-chip.settled {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+}
+
+.ps-color-row {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.ps-color-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ps-color-dot.active {
+  transform: scale(1.15);
+}
+
+/* Actions */
+.ps-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.ps-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.ps-action-btn.remove {
+  background: rgba(96, 165, 250, 0.06);
+  border-color: rgba(96, 165, 250, 0.2);
+  color: var(--accent-blue);
+}
+
+.ps-action-btn.remove:hover {
+  background: rgba(96, 165, 250, 0.12);
+}
+
+.ps-action-btn.delete {
+  background: rgba(248, 113, 113, 0.06);
+  border-color: rgba(248, 113, 113, 0.2);
+  color: var(--accent-red);
+}
+
+.ps-action-btn.delete:hover {
+  background: rgba(248, 113, 113, 0.12);
+}
+
+/* Confirm box */
+.ps-confirm-box {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--accent-red-bg);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ps-confirm-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.ps-confirm-text strong {
+  color: var(--text-primary);
+}
+
+.ps-confirm-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.ps-btn-cancel,
+.ps-btn-danger {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ps-btn-cancel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+.ps-btn-danger {
+  background: rgba(248, 113, 113, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: var(--accent-red);
+}
+
+.ps-btn-danger:hover {
+  background: rgba(248, 113, 113, 0.3);
+}
+
+/* Shared groups row (global view) */
+.ps-groups-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.ps-group-chip {
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}

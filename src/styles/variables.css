@@ -1,0 +1,134 @@
+:root {
+  /* Glass surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-bg-hover: rgba(255, 255, 255, 0.12);
+  --glass-bg-active: rgba(255, 255, 255, 0.16);
+  --glass-bg-strong: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
+  --glass-specular: rgba(255, 255, 255, 0.25);
+  --glass-blur: blur(40px) saturate(180%) brightness(1.05);
+  --glass-blur-light: blur(20px) saturate(160%);
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+
+  /* Typography */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(235, 235, 245, 0.6);
+  --text-tertiary: rgba(235, 235, 245, 0.3);
+
+  /* Accent colors */
+  --accent-green: #30d158;
+  --accent-green-bg: rgba(48, 209, 88, 0.15);
+  --accent-red: #ff453a;
+  --accent-red-bg: rgba(255, 69, 58, 0.15);
+  --accent-blue: #0a84ff;
+  --accent-blue-bg: rgba(10, 132, 255, 0.15);
+  --accent-purple: #bf5af2;
+  --accent-amber: #ff9f0a;
+  --accent-teal: #32ade6;
+
+  /* Background tokens (dark defaults) */
+  --bg-base: #000000;
+  --bg-panel: rgba(28, 28, 30, 0.97);
+  --bg-topbar: rgba(0, 0, 0, 0.72);
+  --bg-sidebar: rgba(0, 0, 0, 0.6);
+  --bg-nav: rgba(20, 20, 22, 0.88);
+  --bg-overlay-dim: rgba(0, 0, 0, 0.6);
+  --bg-code: #1a1a2a;
+
+  /* Fill tokens (dark defaults) */
+  --fill-primary: rgba(255, 255, 255, 0.07);
+  --fill-secondary: rgba(255, 255, 255, 0.05);
+  --fill-tertiary: rgba(255, 255, 255, 0.04);
+  --fill-hover: rgba(255, 255, 255, 0.09);
+
+  /* Border tokens (dark defaults) */
+  --border-prominent: rgba(255, 255, 255, 0.2);
+
+  /* Orb tokens (dark defaults) */
+  --orb-1: rgba(94, 84, 204, 0.5);
+  --orb-2: rgba(14, 132, 211, 0.38);
+  --orb-3: rgba(20, 163, 114, 0.30);
+  --orb-4: rgba(200, 120, 20, 0.22);
+
+  /* Layout */
+  --bottom-nav-height: 82px;
+  --top-bar-height: 60px;
+  --safe-bottom: env(safe-area-inset-bottom, 16px);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Background tokens */
+  --bg-base: #f2f2f7;
+  --bg-panel: rgba(255, 255, 255, 0.98);
+  --bg-topbar: rgba(242, 242, 247, 0.88);
+  --bg-sidebar: rgba(242, 242, 247, 0.94);
+  --bg-nav: rgba(255, 255, 255, 0.88);
+  --bg-overlay-dim: rgba(0, 0, 0, 0.28);
+  --bg-code: #f0f0f5;
+
+  /* Fill tokens */
+  --fill-primary: rgba(0, 0, 0, 0.05);
+  --fill-secondary: rgba(0, 0, 0, 0.035);
+  --fill-tertiary: rgba(0, 0, 0, 0.025);
+  --fill-hover: rgba(0, 0, 0, 0.07);
+
+  /* Border tokens */
+  --border-prominent: rgba(0, 0, 0, 0.14);
+
+  /* Orb tokens */
+  --orb-1: rgba(94, 84, 204, 0.07);
+  --orb-2: rgba(14, 132, 211, 0.05);
+  --orb-3: rgba(20, 163, 114, 0.05);
+  --orb-4: rgba(200, 120, 20, 0.04);
+
+  /* Glass surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-hover: rgba(255, 255, 255, 0.88);
+  --glass-bg-active: rgba(255, 255, 255, 0.96);
+  --glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(0, 0, 0, 0.07);
+  --glass-border-strong: rgba(0, 0, 0, 0.12);
+  --glass-specular: rgba(255, 255, 255, 0.9);
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.07);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.09), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.07);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+
+  /* Typography */
+  --text-primary: rgba(0, 0, 0, 0.9);
+  --text-secondary: rgba(60, 60, 67, 0.6);
+  --text-tertiary: rgba(60, 60, 67, 0.3);
+
+  /* Accent colors */
+  --accent-blue: #007aff;
+  --accent-blue-bg: rgba(0, 122, 255, 0.12);
+  --accent-green: #34c759;
+  --accent-green-bg: rgba(52, 199, 89, 0.12);
+  --accent-red: #ff3b30;
+  --accent-red-bg: rgba(255, 59, 48, 0.12);
+  --accent-amber: #ff9500;
+  --accent-purple: #af52de;
+  --accent-teal: #007aff;
+}

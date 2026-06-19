@@ -1,0 +1,548 @@
+/* ── Sheet overlay/panel (extends shared sheet.css chrome) ─────────────────── */
+
+.eis-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay-dim);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 500;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.eis-panel {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-panel);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-strong);
+  border-bottom: none;
+  border-radius: 32px 32px 0 0;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+
+.eis-tabs {
+  display: flex;
+  margin: 6px 24px 0;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  padding: 3px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.eis-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  color: var(--text-secondary);
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.eis-tab.active {
+  background: var(--glass-bg-strong);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Section wrapper ──────────────────────────────────────────────────────── */
+
+.eis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.eis-section-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── Export option cards ──────────────────────────────────────────────────── */
+
+.eis-option-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.eis-option-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 12px;
+  background: var(--glass-bg);
+  border: 1.5px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  font-family: var(--font);
+  text-align: center;
+}
+
+.eis-option-card:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-strong);
+}
+
+.eis-option-card.selected {
+  background: rgba(96, 165, 250, 0.1);
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.2);
+}
+
+.eis-option-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all var(--transition-base);
+}
+
+.eis-option-card.selected .eis-option-icon {
+  color: var(--accent-blue);
+  border-color: rgba(96, 165, 250, 0.3);
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.eis-option-label {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.eis-option-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.3;
+}
+
+/* ── Select override ──────────────────────────────────────────────────────── */
+
+.eis-select {
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%23888' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px !important;
+}
+
+.eis-select option {
+  background: var(--bg-code);
+  color: #fff;
+}
+
+.eis-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin: 6px 0 0;
+}
+
+/* ── Status banners ───────────────────────────────────────────────────────── */
+
+.eis-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.eis-banner-success {
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  color: #34d399;
+}
+
+.eis-banner-warning {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  color: #fbbf24;
+}
+
+.eis-banner-error {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  color: #f87171;
+}
+
+.eis-banner-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── Drop zone ────────────────────────────────────────────────────────────── */
+
+.eis-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 36px 20px;
+  border: 1.5px dashed var(--glass-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  background: var(--glass-bg);
+  text-align: center;
+  outline: none;
+}
+
+.eis-dropzone:hover,
+.eis-dropzone:focus,
+.eis-dropzone.drag-over {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(96, 165, 250, 0.06);
+}
+
+.eis-dropzone-icon {
+  color: var(--text-tertiary);
+  transition: color var(--transition-base);
+}
+
+.eis-dropzone:hover .eis-dropzone-icon,
+.eis-dropzone.drag-over .eis-dropzone-icon {
+  color: var(--accent-blue);
+}
+
+.eis-dropzone-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.eis-dropzone-sub {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ── File preview ─────────────────────────────────────────────────────────── */
+
+.eis-preview {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.eis-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.eis-preview-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  background: rgba(96, 165, 250, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: var(--radius-full);
+  color: var(--accent-blue);
+}
+
+.eis-preview-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.eis-preview-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.eis-preview-stat-val {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text-primary);
+}
+
+.eis-preview-stat-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.eis-preview-date {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ── Import mode cards ────────────────────────────────────────────────────── */
+
+.eis-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eis-mode-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--glass-bg);
+  border: 1.5px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  font-family: var(--font);
+  text-align: left;
+  width: 100%;
+}
+
+.eis-mode-card:hover {
+  background: var(--glass-bg-hover);
+}
+
+.eis-mode-card.selected {
+  background: rgba(96, 165, 250, 0.08);
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.eis-mode-card.danger.selected {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.eis-mode-radio {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 2px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: border-color var(--transition-fast);
+}
+
+.eis-mode-card.selected .eis-mode-radio {
+  border-color: var(--accent-blue);
+}
+
+.eis-mode-card.danger.selected .eis-mode-radio {
+  border-color: #f87171;
+}
+
+.eis-mode-radio-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+}
+
+.eis-mode-card.danger.selected .eis-mode-radio-dot {
+  background: #f87171;
+}
+
+.eis-mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.eis-mode-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.eis-mode-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* ── Replace acknowledgment checkbox ──────────────────────────────────────── */
+
+.eis-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(248, 113, 113, 0.06);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 12.5px;
+  color: #f87171;
+  line-height: 1.45;
+}
+
+.eis-ack input[type='checkbox'] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: #f87171;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* ── Import done/error state ──────────────────────────────────────────────── */
+
+.eis-import-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.eis-done-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #34d399;
+}
+
+.eis-done-icon.error {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
+  color: #f87171;
+}
+
+.eis-done-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.eis-done-stats {
+  width: 100%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.eis-done-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.eis-done-row:last-child {
+  border-bottom: none;
+}
+
+.eis-done-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.eis-done-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #34d399;
+}
+
+.eis-done-note {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  padding: 8px 16px;
+  margin: 0;
+}
+
+/* ── Utility buttons ──────────────────────────────────────────────────────── */
+
+.eis-text-btn {
+  font-size: 13px;
+  color: var(--accent-blue);
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  font-family: var(--font);
+  transition: opacity var(--transition-fast);
+}
+
+.eis-text-btn:hover { opacity: 0.7; }
+
+.eis-text-btn-sm {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  font-family: var(--font);
+  transition: color var(--transition-fast);
+}
+
+.eis-text-btn-sm:hover { color: var(--text-secondary); }
+
+/* ── Desktop: centered dialog ─────────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  .eis-overlay {
+    align-items: center;
+  }
+
+  .eis-panel {
+    border-radius: 28px;
+    border-bottom: 1px solid var(--glass-border-strong);
+    max-height: 85vh;
+    width: 520px;
+    max-width: 520px;
+  }
+
+  .sheet-handle {
+    display: none;
+  }
+}

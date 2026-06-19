@@ -1,0 +1,217 @@
+.cgs-name-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.cgs-emoji-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.cgs-emoji-btn:hover {
+  transform: scale(1.08);
+}
+
+/* Emoji popover */
+.cgs-emoji-btn-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cgs-emoji-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 200;
+  background: var(--bg-panel);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 12px;
+  min-width: 200px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.cgs-emoji-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--fill-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 22px;
+  padding: 8px 10px;
+  outline: none;
+  text-align: center;
+  font-family: var(--font);
+}
+
+.cgs-emoji-input::placeholder {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.cgs-emoji-input:focus {
+  border-color: var(--glass-border-strong);
+}
+
+.cgs-emoji-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: center;
+  margin: 8px 0 0;
+}
+
+/* Color picker */
+.cgs-color-row {
+  display: flex;
+  gap: 14px;
+}
+
+.cgs-color-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.cgs-color-dot:hover {
+  transform: scale(1.15);
+}
+
+.cgs-color-dot.active {
+  transform: scale(1.1);
+}
+
+/* Member rows */
+.cgs-member-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font);
+  text-align: left;
+  margin-bottom: 4px;
+}
+
+.cgs-member-row:hover {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+}
+
+.cgs-member-row.selected {
+  background: rgba(96, 165, 250, 0.1);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.cgs-member-row.cgs-member-you {
+  cursor: default;
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  margin-bottom: 8px;
+}
+
+.cgs-member-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.cgs-member-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  background: var(--accent-blue-bg);
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+}
+
+.cgs-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid var(--glass-border-strong);
+  background: var(--glass-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.cgs-checkbox.checked {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+/* Add new person */
+.cgs-new-person-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.cgs-add-confirm {
+  padding: 10px 16px;
+  border-radius: var(--radius-full);
+  background: var(--accent-blue-bg);
+  border: 1px solid rgba(96,165,250,0.4);
+  color: var(--accent-blue);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font);
+  transition: all var(--transition-fast);
+}
+
+.cgs-add-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cgs-add-person-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: none;
+  border: 1px dashed var(--glass-border-strong);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font);
+  margin-top: 4px;
+}
+
+.cgs-add-person-btn:hover {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  border-style: solid;
+}

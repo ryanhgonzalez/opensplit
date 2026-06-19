@@ -1,0 +1,341 @@
+.dashboard {
+  padding-top: 8px;
+}
+
+/* Header */
+.dashboard-header {
+  padding: 16px 20px 20px;
+}
+
+.dashboard-greeting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.greeting-sub {
+  margin-bottom: 2px;
+}
+
+.greeting-name {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1.1;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50% !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition: color var(--transition-fast);
+  padding: 0;
+}
+
+.icon-btn:hover {
+  color: var(--text-primary);
+}
+
+/* Hero balance card */
+.balance-hero {
+  border-radius: var(--radius-xl) !important;
+}
+
+.balance-hero-inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.balance-hero-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.balance-hero-amount {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.balance-hero-sub {
+  margin-top: 4px;
+}
+
+.balance-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.balance-breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breakdown-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.breakdown-dot.green {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+.breakdown-dot.red {
+  background: var(--accent-red);
+  box-shadow: 0 0 8px var(--accent-red);
+}
+
+/* Balance tabs */
+.balance-tabs {
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+}
+
+.balance-tab {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all var(--transition-base);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font);
+}
+
+.balance-tab.active {
+  background: var(--glass-bg-strong);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--glass-border);
+}
+
+/* Balance list */
+.balance-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.balance-list-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+}
+
+/* Recent expense inline */
+.recent-expense-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.recent-expense-item:hover {
+  background: var(--fill-tertiary);
+}
+
+.expense-icon-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.expense-info-sm {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.expense-desc-sm {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Groups horizontal scroll */
+.groups-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.groups-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.group-card-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.group-card-emoji {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.group-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.group-card-balance {
+  font-size: 13px;
+}
+
+/* FAB */
+.fab-fixed {
+  position: fixed;
+  bottom: calc(var(--bottom-nav-height) + 28px);
+  right: calc(50vw - 215px + 20px);
+  z-index: 150;
+}
+
+@media (max-width: 430px) {
+  .fab-fixed {
+    right: 20px;
+  }
+}
+
+/* Desktop: 2-column grid layout */
+@media (min-width: 1024px) {
+  /* SideNav user section is the account entry on desktop */
+  .dash-avatar-btn { display: none !important; }
+
+  .dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    column-gap: 28px;
+    padding: 0 28px 48px;
+    align-items: start;
+  }
+
+  /* Header spans both columns */
+  .dashboard-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  /* Left column: balance cards stacked in rows 2-4 */
+  .dash-balance-hero {
+    grid-column: 1;
+    grid-row: 2;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-bottom: 16px !important;
+  }
+
+  .dash-balance-tabs {
+    grid-column: 1;
+    grid-row: 3;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-bottom: 16px !important;
+  }
+
+  .dash-balance-list {
+    grid-column: 1;
+    grid-row: 4;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Right column: recent expenses spanning rows 2-4 */
+  .dash-recent {
+    grid-column: 2;
+    grid-row: 2 / 5;
+  }
+
+  .dash-recent .section-header {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .dash-recent-card {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Groups row: full width below both columns */
+  .dash-groups {
+    grid-column: 1 / -1;
+    grid-row: 5;
+    margin-bottom: 0 !important;
+  }
+
+  .dash-groups .section-header {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Groups: CSS grid instead of horizontal scroll */
+  .dash-groups-scroll {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    overflow-x: visible;
+    gap: 12px;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-bottom: 0;
+  }
+
+  .dash-groups-scroll > * {
+    min-width: 0 !important;
+    flex-shrink: unset !important;
+  }
+}

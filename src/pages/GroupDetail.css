@@ -1,0 +1,285 @@
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.gd-back-btn,
+.gd-add-btn,
+.gd-settings-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+}
+
+.gd-back-btn:hover,
+.gd-add-btn:hover,
+.gd-settings-btn:hover {
+  background: var(--glass-bg-hover);
+}
+
+.gd-add-btn {
+  color: var(--accent-teal);
+  background: rgba(45, 212, 191, 0.1);
+  border-color: rgba(45, 212, 191, 0.25);
+}
+
+/* Summary card */
+.gd-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.gd-member-strip {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gd-member-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.gd-member-chip-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.gd-member-chip-btn:hover {
+  background: var(--glass-bg-hover);
+}
+
+/* Balance rows */
+.gd-balance-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+}
+
+.gd-balance-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.gd-balance-amount {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Settlement rows */
+.gd-settlement-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+}
+
+.gd-settlement-info {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Expense rows */
+.gd-expense-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gd-expense-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.gd-expense-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.gd-expense-desc {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gd-expense-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Expense kebab menu */
+.gd-expense-menu-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.gd-expense-menu-btn:hover,
+.gd-expense-menu-btn.active {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  color: var(--text-primary);
+}
+
+.gd-expense-actions {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+
+.gd-action-edit,
+.gd-action-delete {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: background var(--transition-fast);
+}
+
+.gd-action-edit {
+  color: var(--accent-blue);
+}
+
+.gd-action-edit:hover {
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.gd-action-delete {
+  color: var(--accent-red);
+}
+
+.gd-action-delete:hover {
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.gd-action-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--glass-border);
+}
+
+/* Desktop: 2-panel layout */
+@media (min-width: 1024px) {
+  .gd-page-body {
+    display: grid;
+    grid-template-columns: 2fr 3fr;
+    column-gap: 28px;
+    padding: 20px 28px 48px;
+    align-items: start;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* Left panel: summary, balances, settlements — auto-stacked in column 1 */
+  .gd-section-summary {
+    grid-column: 1;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  .gd-section-balances {
+    grid-column: 1;
+    margin-bottom: 20px !important;
+  }
+
+  .gd-section-balances .px-5,
+  .gd-section-settlements .px-5 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .gd-section-settlements {
+    grid-column: 1;
+    margin-bottom: 0 !important;
+  }
+
+  /* Remove extra horizontal padding from section headers within panels */
+  .gd-page-body .section-header {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Right panel: expenses fill full height of right column */
+  .gd-section-expenses {
+    grid-column: 2;
+    grid-row: 1 / 10;
+    margin-bottom: 0 !important;
+  }
+
+  .gd-section-expenses .px-5 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* Empty state CTA */
+.gd-add-first-btn {
+  margin-top: 4px;
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  background: rgba(96, 165, 250, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: var(--accent-blue);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all var(--transition-fast);
+}
+
+.gd-add-first-btn:hover {
+  background: rgba(96, 165, 250, 0.22);
+}

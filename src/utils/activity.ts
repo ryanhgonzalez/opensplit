@@ -1,0 +1,84 @@
+import { Activity, Expense, User } from '../types';
+import { getShareForUser } from './expense';
+import { formatCurrency } from './format';
+
+type GetExpense = (id: string) => Expense | undefined;
+type GetUser = (id: string) => User | undefined;
+
+export function getActivityDescription(
+  activity: Activity,
+  currentUserId: string,
+  getExpense: GetExpense,
+  getUser: GetUser
+): string {
+  const actorName =
+    activity.actorId === currentUserId
+      ? 'You'
+      : (getUser(activity.actorId)?.name ?? 'Someone');
+
+  switch (activity.type) {
+    case 'expense_added': {
+      const expense = getExpense(activity.expenseId);
+      return `${actorName} added "${expense?.description ?? 'an expense'}"`;
+    }
+    case 'expense_updated': {
+      const expense = getExpense(activity.expenseId);
+      return `${actorName} updated "${expense?.description ?? 'an expense'}"`;
+    }
+    case 'expense_deleted':
+      return `${actorName} deleted "${activity.expenseDescription}"`;
+    case 'payment': {
+      const toName =
+        activity.toUserId === currentUserId
+          ? 'you'
+          : (getUser(activity.toUserId)?.name ?? 'someone');
+      if (activity.actorId === currentUserId) {
+        return `You paid ${toName} ${formatCurrency(activity.amount)}`;
+      }
+      return `${actorName} paid ${toName} ${formatCurrency(activity.amount)}`;
+    }
+    case 'settled': {
+      const toName =
+        activity.toUserId === currentUserId
+          ? 'you'
+          : (getUser(activity.toUserId)?.name ?? 'someone');
+      if (activity.actorId === currentUserId) {
+        return `You settled up with ${toName}`;
+      }
+      return `${actorName} settled up with ${toName}`;
+    }
+  }
+}
+
+export function isActivityPositive(activity: Activity, currentUserId: string): boolean {
+  switch (activity.type) {
+    case 'expense_added':
+    case 'expense_updated':
+      return activity.actorId === currentUserId;
+    case 'expense_deleted':
+      return false;
+    case 'payment':
+    case 'settled':
+      return activity.toUserId === currentUserId;
+  }
+}
+
+export function getActivityAmount(
+  activity: Activity,
+  currentUserId: string,
+  getExpense: GetExpense
+): number {
+  switch (activity.type) {
+    case 'expense_added':
+    case 'expense_updated': {
+      const expense = getExpense(activity.expenseId);
+      if (!expense) return 0;
+      return Math.abs(getShareForUser(expense, currentUserId));
+    }
+    case 'expense_deleted':
+      return 0;
+    case 'payment':
+    case 'settled':
+      return activity.amount;
+  }
+}
