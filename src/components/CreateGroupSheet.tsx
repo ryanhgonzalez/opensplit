@@ -53,8 +53,6 @@ export default function CreateGroupSheet({ open, onClose, onCreated }: CreateGro
     return () => document.removeEventListener('mousedown', handler);
   }, [showEmojiInput]);
 
-  const friends = users.filter(u => u.id !== currentUser.id);
-
   const toggleMember = (id: string) =>
     setSelectedIds(prev => {
       const next = new Set(prev);

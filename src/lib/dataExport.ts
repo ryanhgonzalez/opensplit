@@ -233,8 +233,8 @@ export function parseAndValidate(json: string): ParseResult {
   }
 
   // Revive ISO date strings → Date objects.
-  const revived = reviveDates(raw) as AppExport;
-  return { ok: true, data: revived, warnings };
+  const revived = reviveDates(raw) as unknown as AppExport;
+  return { ok: true, data: revived, warnings, errors: [] };
 }
 
 // ─── ID remapping — used for "Import as new group" ───────────────────────────

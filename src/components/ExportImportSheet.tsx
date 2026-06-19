@@ -22,7 +22,7 @@ const overlayVariants = {
 const panelVariants = {
   hidden:  { y: '100%', opacity: 0.6 },
   visible: { y: 0, opacity: 1, transition: { type: 'spring' as const, damping: 32, stiffness: 320 } },
-  exit:    { y: '100%', opacity: 0, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] as number[] } },
+  exit:    { y: '100%', opacity: 0, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] as [number, number, number, number] } },
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ function StatusBanner({ type, children }: { type: 'success' | 'warning' | 'error
 }
 
 function ImportModeCard({
-  value,
+  value: _value,
   selected,
   onSelect,
   title,

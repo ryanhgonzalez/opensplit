@@ -32,7 +32,7 @@ export default function GlassCard({
       style={{ padding, ...style }}
       onClick={onClick}
       whileTap={onClick ? { scale: 0.98 } : undefined}
-      transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+      transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
     >
       {children}
     </motion.div>

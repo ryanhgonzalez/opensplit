@@ -20,7 +20,7 @@ const containerVariants = {
 };
 const itemVariants = {
   hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.36, ease: [0.4, 0, 0.2, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.36, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
 };
 
 export default function GroupDetail() {
@@ -349,7 +349,7 @@ export default function GroupDetail() {
         onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.35, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
+        transition={{ delay: 0.35, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number] }}
         whileTap={{ scale: 0.92 }}
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">

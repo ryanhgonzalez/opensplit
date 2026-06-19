@@ -23,7 +23,7 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, x: -16 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } },
+  show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
 };
 
 function groupByDate(items: Activity[]) {

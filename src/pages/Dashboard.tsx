@@ -17,7 +17,7 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
 };
 
 type BalanceTab = 'owe' | 'owed';
@@ -71,7 +71,7 @@ export default function Dashboard() {
                   className={`balance-hero-amount ${isPositive ? 'text-green' : 'text-red'}`}
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.3, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
+                  transition={{ delay: 0.3, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number] }}
                 >
                   {formatCurrency(Math.abs(balance.net))}
                 </motion.p>
@@ -234,7 +234,7 @@ export default function Dashboard() {
         aria-label="Add expense"
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.6, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
+        transition={{ delay: 0.6, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number] }}
         onClick={() => setShowAddExpense(true)}
         whileTap={{ scale: 0.92 }}
       >

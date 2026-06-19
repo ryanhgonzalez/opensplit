@@ -63,7 +63,7 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
   };
 
   const handleRemoveFromGroup = () => {
-    removeGroupMember(groupId, userId);
+    removeGroupMember(groupId!, userId);
     onClose();
   };
 
