@@ -9,12 +9,19 @@
 }
 
 html {
+  /* Fallback first; dvh wins where supported. In iOS standalone (home-screen)
+     mode, `height: 100%` resolves short of the real screen height and leaves a
+     blank strip at the bottom — the dynamic viewport unit fills it correctly. */
   height: 100%;
+  height: 100dvh;
   font-size: 16px;
+  /* Paint the canvas so any residual safe-area gap shows the brand color, not white. */
+  background: var(--bg-base);
 }
 
 body {
   height: 100%;
+  height: 100dvh;
   font-family: var(--font);
   color: var(--text-primary);
   overflow: hidden;
@@ -25,6 +32,7 @@ body {
 
 #root {
   height: 100%;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
