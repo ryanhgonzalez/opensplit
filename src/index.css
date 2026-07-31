@@ -8,22 +8,6 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ⚠️ TEMPORARY DIAGNOSTIC — remove after testing.
-   A magenta strip pinned to the bottom edge of the web viewport. If it runs all the
-   way to the physical bottom of the screen, the app now fills the screen. If there is
-   a black strip BELOW the magenta, the viewport is still short. */
-body::after {
-  content: '';
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 22px;
-  background: #ff00ff;
-  z-index: 99999;
-  pointer-events: none;
-}
-
 html {
   /* Fallback first; dvh wins where supported. In iOS standalone (home-screen)
      mode, `height: 100%` resolves short of the real screen height and leaves a
