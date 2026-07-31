@@ -35,5 +35,41 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- ⚠️ TEMPORARY DIAGNOSTIC — remove after testing. Prints real viewport metrics. -->
+    <script>
+      window.addEventListener('load', function () {
+        try {
+          var probeB = document.createElement('div');
+          probeB.style.cssText = 'position:fixed;bottom:0;height:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none;';
+          document.body.appendChild(probeB);
+          var probeT = document.createElement('div');
+          probeT.style.cssText = 'position:fixed;top:0;height:0;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none;';
+          document.body.appendChild(probeT);
+          var sabB = getComputedStyle(probeB).paddingBottom;
+          var sabT = getComputedStyle(probeT).paddingTop;
+          var vv = window.visualViewport || {};
+          var box = document.createElement('div');
+          box.style.cssText = 'position:fixed;top:110px;left:8px;right:8px;z-index:100000;background:rgba(190,0,255,0.94);color:#fff;font:12px/1.55 ui-monospace,monospace;padding:12px;border-radius:10px;pointer-events:none;white-space:pre;';
+          box.textContent =
+            'screen:        ' + screen.width + ' x ' + screen.height + '\n' +
+            'inner W/H:     ' + window.innerWidth + ' x ' + window.innerHeight + '\n' +
+            'visualVP H:    ' + (vv.height || '?') + '\n' +
+            'docEl clientH: ' + document.documentElement.clientHeight + '\n' +
+            'DPR:           ' + window.devicePixelRatio + '\n' +
+            'safe top:      ' + sabT + '\n' +
+            'safe bottom:   ' + sabB + '\n' +
+            'screen.h-inner:' + (screen.height - window.innerHeight) + '\n' +
+            'nav.standalone:' + window.navigator.standalone + '\n' +
+            'dm standalone: ' + window.matchMedia('(display-mode: standalone)').matches + '\n' +
+            'dm fullscreen: ' + window.matchMedia('(display-mode: fullscreen)').matches;
+          document.body.appendChild(box);
+        } catch (e) {
+          var err = document.createElement('div');
+          err.style.cssText = 'position:fixed;top:110px;left:8px;z-index:100000;background:red;color:#fff;font:12px monospace;padding:8px;';
+          err.textContent = 'diag error: ' + e;
+          document.body.appendChild(err);
+        }
+      });
+    </script>
   </body>
 </html>
