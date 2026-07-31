@@ -73,6 +73,18 @@ function lastY(doc: jsPDF): number {
   return (doc as any).lastAutoTable?.finalY ?? 0;
 }
 
+// Shrinks the current font size (must already be set) until `text` fits within
+// `maxWidth`, so long values (e.g. wide date ranges) never bleed into the next column.
+function fitFontSize(doc: jsPDF, text: string, maxWidth: number, baseSize: number, minSize = 6.5): number {
+  let size = baseSize;
+  doc.setFontSize(size);
+  while (doc.getTextWidth(text) > maxWidth && size > minSize) {
+    size -= 0.5;
+    doc.setFontSize(size);
+  }
+  return size;
+}
+
 // ─── Table theme shared across all tables ─────────────────────────────────────
 
 const tableDefaults = (margin: number) => ({
@@ -194,6 +206,8 @@ export function generateGroupReport(
     { label: 'MEMBERS',      value: String(group.members.length) },
   ];
 
+  const statMaxWidth = colW - 8; // leave a gap before the next column starts
+
   stats.forEach((stat, i) => {
     const x = margin + i * colW + 5;
     doc.setFont('helvetica', 'normal');
@@ -201,7 +215,7 @@ export function generateGroupReport(
     doc.setTextColor(...C.gray);
     doc.text(stat.label, x, y + 8);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
+    fitFontSize(doc, stat.value, statMaxWidth, 10.5);
     doc.setTextColor(...C.dark);
     doc.text(stat.value, x, y + 18);
   });
@@ -403,12 +417,12 @@ export function generateGroupReport(
   autoTable(doc, {
     startY: y,
     ...tableDefaults(margin),
-    head: [['Member', 'Paid (↑ credit)', 'Share (↓ debit)', 'Running Net', 'Verdict']],
+    head: [['Member', 'Paid (credit)', 'Share (debit)', 'Running Net', 'Verdict']],
     body: memberStats.map((ms) => {
       const verdict = Math.abs(ms.net) < 0.005
         ? 'Balanced'
-        : ms.net > 0 ? `${getName(ms.name)} is owed ${usd(ms.net)}`
-                     : `${getName(ms.name)} owes ${usd(Math.abs(ms.net))}`;
+        : ms.net > 0 ? `${ms.name} is owed ${usd(ms.net)}`
+                     : `${ms.name} owes ${usd(Math.abs(ms.net))}`;
       return [
         { content: ms.name, styles: { fontStyle: 'bold' as const } },
         { content: `+${usd(ms.paid)}`,  styles: { halign: 'right' as const, textColor: C.green } },
@@ -470,7 +484,7 @@ export function generateGroupReport(
           { content: getName(s.from), styles: { fontStyle: 'bold' as const, textColor: C.red } },
           { content: getName(s.to),   styles: { fontStyle: 'bold' as const, textColor: C.green } },
           { content: usd(s.amount),   styles: { fontStyle: 'bold' as const, halign: 'right' as const } },
-          `${getName(s.from)}'s ${usd(Math.abs(fromBal))} debt → ${getName(s.to)}'s ${usd(Math.abs(toBal))} credit`,
+          `${getName(s.from)}'s ${usd(Math.abs(fromBal))} debt -> ${getName(s.to)}'s ${usd(Math.abs(toBal))} credit`,
         ];
       }),
       foot: [[
