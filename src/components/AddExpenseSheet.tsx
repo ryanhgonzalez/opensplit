@@ -77,7 +77,8 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
   const [lineItems, setLineItems] = useState<ItemRow[]>([]);
 
   // Receipt scanning (client-side OCR — fills a draft the user reviews before saving)
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null); // capture=camera (touch devices)
+  const fileInputRef = useRef<HTMLInputElement>(null);   // library / file picker (all devices)
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -354,34 +355,54 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
               {!isEditing && (
                 <div className="aes-scan">
                   <input
-                    ref={fileInputRef}
+                    ref={cameraInputRef}
                     type="file"
                     accept="image/*"
                     capture="environment"
                     hidden
                     onChange={handleReceiptSelected}
                   />
-                  <button
-                    type="button"
-                    className="aes-scan-btn"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={scanning}
-                  >
-                    {scanning ? (
-                      <>
-                        <span className="aes-scan-spinner" aria-hidden />
-                        Reading receipt… {Math.round(scanProgress * 100)}%
-                      </>
-                    ) : (
-                      <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={handleReceiptSelected}
+                  />
+
+                  {scanning ? (
+                    <button type="button" className="aes-scan-btn" disabled>
+                      <span className="aes-scan-spinner" aria-hidden />
+                      Reading receipt… {Math.round(scanProgress * 100)}%
+                    </button>
+                  ) : (
+                    <div className="aes-scan-actions">
+                      {/* Camera capture — only useful on touch devices (hidden on desktop via CSS) */}
+                      <button
+                        type="button"
+                        className="aes-scan-btn aes-scan-camera"
+                        onClick={() => cameraInputRef.current?.click()}
+                      >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
                           <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                           <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="2" />
                         </svg>
-                        Scan receipt
-                      </>
-                    )}
-                  </button>
+                        Take photo
+                      </button>
+                      {/* Library / file picker — on iOS/Android this sheet also offers the camera */}
+                      <button
+                        type="button"
+                        className="aes-scan-btn"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M12 16V4M8 8l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Upload photo
+                      </button>
+                    </div>
+                  )}
                   {scanError && <div className="aes-scan-msg error">{scanError}</div>}
                   {scanned && !scanError && (
                     <div className="aes-scan-msg ok">Filled from receipt — double-check the details below.</div>

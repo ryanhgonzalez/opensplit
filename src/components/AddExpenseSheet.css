@@ -30,6 +30,26 @@
   opacity: 0.85;
 }
 
+/* Two-up: Take photo + Upload photo */
+.aes-scan-actions {
+  display: flex;
+  gap: 8px;
+}
+.aes-scan-actions .aes-scan-btn {
+  flex: 1;
+  min-width: 0;
+}
+/* The camera-capture button only makes sense on touch devices; on desktop the
+   single "Upload photo" button (file picker) is shown instead. */
+.aes-scan-camera {
+  display: none;
+}
+@media (pointer: coarse) {
+  .aes-scan-camera {
+    display: flex;
+  }
+}
+
 .aes-scan-spinner {
   width: 15px;
   height: 15px;
