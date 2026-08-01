@@ -121,6 +121,57 @@ export function buildSplit(
   return { type, entries };
 }
 
+/** One receipt line item and the members sharing it. */
+export interface ItemAssignment {
+  price: number;
+  assigned: string[]; // userIds sharing this item
+}
+
+/**
+ * Itemized split: each item is divided equally among its assignees, then any
+ * remaining tax/tip (`total − itemsSum`) is distributed proportionally to each
+ * member's item subtotal. Returns exact per-member entries that sum to `total`.
+ *
+ * @example
+ * // Latte $4.50 (A), Croissant $3.25 (B), Sandwich $8.75 (A+B); total $17.99
+ * splitByItems(17.99, 16.50, items, ['A','B']) // → [{A, 9.68}, {B, 8.31}]
+ */
+export function splitByItems(
+  total: number,
+  itemsSum: number,
+  items: ItemAssignment[],
+  memberIds: string[],
+): SplitEntry[] {
+  const per: Record<string, number> = {};
+  for (const id of memberIds) per[id] = 0;
+
+  for (const it of items) {
+    const who = it.assigned.filter((id) => memberIds.includes(id));
+    if (it.price <= 0 || who.length === 0) continue;
+    const share = it.price / who.length;
+    for (const id of who) per[id] += share;
+  }
+
+  const extra = total - itemsSum; // tax + tip (or discount, if negative)
+  if (itemsSum > 0 && Math.abs(extra) > EPSILON) {
+    for (const id of memberIds) per[id] += extra * (per[id] / itemsSum);
+  }
+
+  const entries = memberIds
+    .map((id) => ({ userId: id, amount: round(per[id]) }))
+    .filter((e) => e.amount > 0);
+
+  // Correct any rounding drift so entries sum exactly to `total`.
+  const sum = round(entries.reduce((s, e) => s + e.amount, 0));
+  const diff = round(total - sum);
+  if (Math.abs(diff) >= 0.01 && entries.length > 0) {
+    const idx = entries.reduce((best, e, i) => (e.amount > entries[best].amount ? i : best), 0);
+    entries[idx] = { ...entries[idx], amount: round(entries[idx].amount + diff) };
+  }
+
+  return entries;
+}
+
 // ─── Split validation ─────────────────────────────────────────────────────────
 
 /** Returns true when the split entries sum to within one cent of the expense amount. */

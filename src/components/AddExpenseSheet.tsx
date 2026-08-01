@@ -1,24 +1,36 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore, selectCurrentUser } from '../store';
-import { buildSplit, round } from '../lib/calculations';
+import { buildSplit, round, splitByItems } from '../lib/calculations';
 import { CATEGORY_ICONS, CATEGORY_LABELS } from '../types';
-import type { Expense, ExpenseCategory, SplitType } from '../types';
+import type { Expense, ExpenseCategory, SplitType, ExpenseSplit } from '../types';
 import Avatar from './Avatar';
 import '../styles/sheet.css';
 import './AddExpenseSheet.css';
 
+// Local UI split mode — adds "items" on top of the persisted SplitType values.
+// Itemized entry produces an `exact` split on save, so it's never persisted as a type.
+type SplitMode = 'equal' | 'exact' | 'percentage' | 'items';
+
 const CATEGORIES = Object.keys(CATEGORY_ICONS) as ExpenseCategory[];
-const SPLIT_TYPES: { value: SplitType; label: string }[] = [
-  { value: 'equal',   label: 'Equal' },
-  { value: 'exact',   label: 'Exact' },
+const SPLIT_TYPES: { value: SplitMode; label: string }[] = [
+  { value: 'equal',      label: 'Equal' },
+  { value: 'exact',      label: 'Exact' },
   { value: 'percentage', label: 'Percent' },
+  { value: 'items',      label: 'Items' },
 ];
 
 interface Participant {
   userId: string;
   checked: boolean;
   value: string; // dollar amount or percentage, depending on splitType
+}
+
+interface ItemRow {
+  id: string;
+  description: string;
+  price: string;
+  assigned: string[]; // userIds sharing this item
 }
 
 interface AddExpenseSheetProps {
@@ -28,6 +40,21 @@ interface AddExpenseSheetProps {
   editExpense?: Expense;
 }
 
+// ─── Date-input helpers (local, timezone-safe) ────────────────────────────────
+function toDateInputValue(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+function fromDateInputValue(str: string): Date {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1); // local midnight
+}
+
+let itemSeq = 0;
+const newItemId = () => `item-${Date.now()}-${itemSeq++}`;
+
 export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExpense }: AddExpenseSheetProps) {
   const isEditing = !!editExpense;
   const currentUser = useStore(selectCurrentUser)!;
@@ -36,16 +63,18 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
   const addExpense = useStore(s => s.addExpense);
   const updateExpense = useStore(s => s.updateExpense);
 
-  const initSplitType = (e?: Expense): SplitType =>
-    e?.split.type === 'percentage' ? 'exact' : (e?.split.type ?? 'equal');
+  const initSplitType = (e?: Expense): SplitMode =>
+    e?.split.type === 'percentage' ? 'exact' : (e?.split.type === 'shares' ? 'exact' : (e?.split.type ?? 'equal'));
 
   const [description, setDescription] = useState(editExpense?.description ?? '');
   const [amountStr, setAmountStr] = useState(editExpense ? String(editExpense.amount) : '');
   const [category, setCategory] = useState<ExpenseCategory>(editExpense?.category ?? 'food');
+  const [dateStr, setDateStr] = useState(editExpense ? toDateInputValue(editExpense.date) : '');
   const [groupId, setGroupId] = useState(editExpense?.groupId ?? defaultGroupId ?? '');
   const [paidBy, setPaidBy] = useState(editExpense?.paidBy ?? currentUser.id);
-  const [splitType, setSplitType] = useState<SplitType>(initSplitType(editExpense));
+  const [splitType, setSplitType] = useState<SplitMode>(initSplitType(editExpense));
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [lineItems, setLineItems] = useState<ItemRow[]>([]);
 
   // Receipt scanning (client-side OCR — fills a draft the user reviews before saving)
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +84,7 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
   const [scanned, setScanned] = useState(false);
 
   const selectedGroup = useMemo(() => groups.find(g => g.id === groupId), [groups, groupId]);
+  const groupMemberIds = useMemo(() => selectedGroup?.members.map(m => m.userId) ?? [], [selectedGroup]);
   const getUserById = (id: string) => users.find(u => u.id === id);
 
   // Rebuild participants when selected group changes (or when editing a different expense).
@@ -78,6 +108,9 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
       setParticipants(
         selectedGroup.members.map(m => ({ userId: m.userId, checked: true, value: '' }))
       );
+      // Any items already added (e.g. from a scan before a group was picked) default to
+      // being shared by everyone in the newly-selected group.
+      setLineItems(prev => prev.map(it => ({ ...it, assigned: selectedGroup.members.map(m => m.userId) })));
       if (!selectedGroup.members.some(m => m.userId === paidBy)) {
         setPaidBy(currentUser.id);
       }
@@ -93,10 +126,7 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
 
   // Running total for exact / percentage modes
   const enteredTotal = useMemo(() => {
-    if (splitType === 'exact') {
-      return checkedParticipants.reduce((s, p) => s + (parseFloat(p.value) || 0), 0);
-    }
-    if (splitType === 'percentage') {
+    if (splitType === 'exact' || splitType === 'percentage') {
       return checkedParticipants.reduce((s, p) => s + (parseFloat(p.value) || 0), 0);
     }
     return parsedAmount;
@@ -108,6 +138,30 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
     ? round(100 - enteredTotal)
     : 0;
 
+  // ── Itemized computation ────────────────────────────────────────────────────
+  const itemsSum = useMemo(
+    () => round(lineItems.reduce((s, it) => s + (parseFloat(it.price) || 0), 0)),
+    [lineItems],
+  );
+  // In items mode the hero amount is the grand total (incl. tax/tip). Left blank, it
+  // falls back to the items sum (no tax/tip).
+  const effectiveTotal = splitType === 'items' ? (parsedAmount > 0 ? parsedAmount : itemsSum) : parsedAmount;
+
+  // Per-person entries: each item split equally among its assignees, then the
+  // remaining tax/tip distributed proportionally (see splitByItems).
+  const itemEntries = useMemo(
+    () => splitByItems(
+      effectiveTotal,
+      itemsSum,
+      lineItems.map(it => ({ price: parseFloat(it.price) || 0, assigned: it.assigned })),
+      groupMemberIds,
+    ),
+    [lineItems, groupMemberIds, effectiveTotal, itemsSum],
+  );
+
+  const itemAmountFor = (id: string) => itemEntries.find(e => e.userId === id)?.amount ?? 0;
+
+  // ── Validation ──────────────────────────────────────────────────────────────
   const splitValid = useMemo(() => {
     if (checkedCount === 0) return false;
     if (splitType === 'equal') return parsedAmount > 0;
@@ -116,24 +170,47 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
     return false;
   }, [splitType, remainder, parsedAmount, checkedCount]);
 
-  const canSubmit = description.trim().length > 0 && parsedAmount > 0 && groupId && splitValid;
+  const pricedItems = lineItems.filter(it => (parseFloat(it.price) || 0) > 0);
+  const allPricedAssigned = pricedItems.every(it => it.assigned.some(id => groupMemberIds.includes(id)));
+  const itemsValid =
+    groupMemberIds.length > 0 &&
+    pricedItems.length > 0 &&
+    allPricedAssigned &&
+    itemsSum > 0 &&
+    effectiveTotal > 0 &&
+    itemsSum <= effectiveTotal + 0.01;
 
+  const canSubmit =
+    description.trim().length > 0 &&
+    !!groupId &&
+    (splitType === 'items' ? itemsValid : parsedAmount > 0 && splitValid);
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const toggleParticipant = (userId: string) => {
-    setParticipants(prev =>
-      prev.map(p => p.userId === userId ? { ...p, checked: !p.checked } : p)
-    );
+    setParticipants(prev => prev.map(p => p.userId === userId ? { ...p, checked: !p.checked } : p));
   };
 
   const setParticipantValue = (userId: string, value: string) => {
-    setParticipants(prev =>
-      prev.map(p => p.userId === userId ? { ...p, value } : p)
-    );
+    setParticipants(prev => prev.map(p => p.userId === userId ? { ...p, value } : p));
   };
 
-  const handleSplitTypeChange = (type: SplitType) => {
-    setSplitType(type);
+  const handleSplitTypeChange = (mode: SplitMode) => {
+    setSplitType(mode);
     setParticipants(prev => prev.map(p => ({ ...p, value: '' })));
+    if (mode === 'items' && lineItems.length === 0) {
+      setLineItems([{ id: newItemId(), description: '', price: '', assigned: [...groupMemberIds] }]);
+    }
   };
+
+  const addItem = () =>
+    setLineItems(prev => [...prev, { id: newItemId(), description: '', price: '', assigned: [...groupMemberIds] }]);
+  const removeItem = (id: string) => setLineItems(prev => prev.filter(it => it.id !== id));
+  const updateItem = (id: string, field: 'description' | 'price', value: string) =>
+    setLineItems(prev => prev.map(it => (it.id === id ? { ...it, [field]: value } : it)));
+  const toggleItemAssign = (id: string, userId: string) =>
+    setLineItems(prev => prev.map(it => it.id === id
+      ? { ...it, assigned: it.assigned.includes(userId) ? it.assigned.filter(u => u !== userId) : [...it.assigned, userId] }
+      : it));
 
   const handleReceiptSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -152,6 +229,18 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
       if (result.amount && result.amount > 0) { setAmountStr(String(result.amount)); filledAny = true; }
       if (result.description) { setDescription(result.description); filledAny = true; }
       if (result.category) { setCategory(result.category); filledAny = true; }
+      if (result.date) { setDateStr(toDateInputValue(result.date)); filledAny = true; }
+      if (result.lineItems && result.lineItems.length > 0) {
+        const assigned = groupMemberIds;
+        setLineItems(result.lineItems.map(li => ({
+          id: newItemId(),
+          description: li.description,
+          price: li.amount.toFixed(2),
+          assigned: [...assigned],
+        })));
+        setSplitType('items');
+        filledAny = true;
+      }
 
       if (!filledAny) {
         setScanError("Couldn't read that receipt. Try a clearer, well-lit photo — or enter the details manually.");
@@ -169,32 +258,42 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
   const handleSubmit = () => {
     if (!canSubmit) return;
 
-    const activeParticipants = participants
-      .filter(p => p.checked)
-      .map(p => ({
-        userId: p.userId,
-        value: splitType !== 'equal' ? (parseFloat(p.value) || 0) : undefined,
-      }));
+    const expenseDate = dateStr ? fromDateInputValue(dateStr) : new Date();
 
-    const split = buildSplit(parsedAmount, splitType, activeParticipants);
+    let amount: number;
+    let split: ExpenseSplit;
+    if (splitType === 'items') {
+      amount = effectiveTotal;
+      split = { type: 'exact', entries: itemEntries };
+    } else {
+      amount = parsedAmount;
+      const activeParticipants = participants
+        .filter(p => p.checked)
+        .map(p => ({
+          userId: p.userId,
+          value: splitType !== 'equal' ? (parseFloat(p.value) || 0) : undefined,
+        }));
+      split = buildSplit(parsedAmount, splitType as SplitType, activeParticipants);
+    }
 
     if (isEditing && editExpense) {
       updateExpense(editExpense.id, {
         description: description.trim(),
-        amount: parsedAmount,
+        amount,
         paidBy,
         groupId: groupId || undefined,
         split,
         category,
+        date: expenseDate,
       });
     } else {
       addExpense({
         description: description.trim(),
-        amount: parsedAmount,
+        amount,
         currency: 'USD',
         paidBy,
         groupId: groupId || undefined,
-        date: new Date(),
+        date: expenseDate,
         split,
         category,
       });
@@ -207,16 +306,20 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
     setDescription(editExpense?.description ?? '');
     setAmountStr(editExpense ? String(editExpense.amount) : '');
     setCategory(editExpense?.category ?? 'food');
+    setDateStr(editExpense ? toDateInputValue(editExpense.date) : '');
     setGroupId(editExpense?.groupId ?? defaultGroupId ?? '');
     setPaidBy(editExpense?.paidBy ?? currentUser.id);
     setSplitType(initSplitType(editExpense));
     setParticipants([]);
+    setLineItems([]);
     setScanning(false);
     setScanProgress(0);
     setScanError(null);
     setScanned(false);
     onClose();
   };
+
+  const ctaTotal = splitType === 'items' ? effectiveTotal : parsedAmount;
 
   return (
     <AnimatePresence>
@@ -329,6 +432,18 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
                 </div>
               </div>
 
+              {/* Date */}
+              <div className="field-group">
+                <div className="field-label">Date</div>
+                <input
+                  className="field-input aes-date-input"
+                  type="date"
+                  value={dateStr}
+                  onChange={e => setDateStr(e.target.value)}
+                />
+                <div className="aes-field-hint text-tertiary text-xs">Leave empty to use today's date.</div>
+              </div>
+
               {/* Group (only shown when no default) */}
               {!defaultGroupId && (
                 <div className="field-group">
@@ -396,82 +511,198 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
                     </div>
                   </div>
 
-                  <div className="aes-participants">
-                    {participants.map(p => {
-                      const u = getUserById(p.userId);
-                      if (!u) return null;
-                      const isMe = p.userId === currentUser.id;
-                      const sharePreview = splitType === 'equal' && parsedAmount > 0 && p.checked
-                        ? formatSharePreview(equalShare)
-                        : null;
+                  {splitType !== 'items' ? (
+                    <>
+                      <div className="aes-participants">
+                        {participants.map(p => {
+                          const u = getUserById(p.userId);
+                          if (!u) return null;
+                          const isMe = p.userId === currentUser.id;
+                          const sharePreview = splitType === 'equal' && parsedAmount > 0 && p.checked
+                            ? formatSharePreview(equalShare)
+                            : null;
 
-                      return (
-                        <div
-                          key={p.userId}
-                          className={`aes-participant ${p.checked ? 'checked' : 'unchecked'}`}
-                        >
-                          <button className="aes-participant-check" onClick={() => toggleParticipant(p.userId)}>
-                            <div className={`cgs-checkbox ${p.checked ? 'checked' : ''}`} style={{ width: 20, height: 20 }}>
-                              {p.checked && (
-                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                                  <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </div>
-                          </button>
-                          <Avatar user={u} size="sm" />
-                          <span className="aes-participant-name">
-                            {isMe ? 'You' : u.name.split(' ')[0]}
-                          </span>
-
-                          {splitType === 'equal' && (
-                            <span className="aes-equal-share text-secondary text-sm">
-                              {sharePreview ?? '—'}
-                            </span>
-                          )}
-
-                          {(splitType === 'exact' || splitType === 'percentage') && p.checked && (
-                            <div className="aes-value-input-wrap">
-                              <span className="aes-value-prefix">
-                                {splitType === 'exact' ? '$' : ''}
+                          return (
+                            <div
+                              key={p.userId}
+                              className={`aes-participant ${p.checked ? 'checked' : 'unchecked'}`}
+                            >
+                              <button className="aes-participant-check" onClick={() => toggleParticipant(p.userId)}>
+                                <div className={`cgs-checkbox ${p.checked ? 'checked' : ''}`} style={{ width: 20, height: 20 }}>
+                                  {p.checked && (
+                                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                      <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  )}
+                                </div>
+                              </button>
+                              <Avatar user={u} size="sm" />
+                              <span className="aes-participant-name">
+                                {isMe ? 'You' : u.name.split(' ')[0]}
                               </span>
-                              <input
-                                className="aes-value-input"
-                                type="number"
-                                inputMode="decimal"
-                                placeholder="0"
-                                min="0"
-                                value={p.value}
-                                onChange={e => setParticipantValue(p.userId, e.target.value)}
-                              />
-                              {splitType === 'percentage' && (
-                                <span className="aes-value-suffix">%</span>
+
+                              {splitType === 'equal' && (
+                                <span className="aes-equal-share text-secondary text-sm">
+                                  {sharePreview ?? '—'}
+                                </span>
+                              )}
+
+                              {(splitType === 'exact' || splitType === 'percentage') && p.checked && (
+                                <div className="aes-value-input-wrap">
+                                  <span className="aes-value-prefix">
+                                    {splitType === 'exact' ? '$' : ''}
+                                  </span>
+                                  <input
+                                    className="aes-value-input"
+                                    type="number"
+                                    inputMode="decimal"
+                                    placeholder="0"
+                                    min="0"
+                                    value={p.value}
+                                    onChange={e => setParticipantValue(p.userId, e.target.value)}
+                                  />
+                                  {splitType === 'percentage' && (
+                                    <span className="aes-value-suffix">%</span>
+                                  )}
+                                </div>
                               )}
                             </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Remainder indicator */}
+                      {splitType !== 'equal' && parsedAmount > 0 && (
+                        <div className={`aes-remainder ${Math.abs(remainder) < 0.01 ? 'ok' : 'warn'}`}>
+                          {Math.abs(remainder) < 0.01 ? (
+                            <>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                                <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              Splits add up ✓
+                            </>
+                          ) : (
+                            <>
+                              {splitType === 'exact'
+                                ? `${remainder > 0 ? '$' + remainder.toFixed(2) + ' remaining' : '$' + Math.abs(remainder).toFixed(2) + ' over'}`
+                                : `${remainder > 0 ? remainder.toFixed(1) + '% remaining' : Math.abs(remainder).toFixed(1) + '% over'}`
+                              }
+                            </>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Remainder indicator */}
-                  {splitType !== 'equal' && parsedAmount > 0 && (
-                    <div className={`aes-remainder ${Math.abs(remainder) < 0.01 ? 'ok' : 'warn'}`}>
-                      {Math.abs(remainder) < 0.01 ? (
-                        <>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                            <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                          Splits add up ✓
-                        </>
-                      ) : (
-                        <>
-                          {splitType === 'exact'
-                            ? `${remainder > 0 ? '$' + remainder.toFixed(2) + ' remaining' : '$' + Math.abs(remainder).toFixed(2) + ' over'}`
-                            : `${remainder > 0 ? remainder.toFixed(1) + '% remaining' : Math.abs(remainder).toFixed(1) + '% over'}`
-                          }
-                        </>
                       )}
+                    </>
+                  ) : (
+                    /* ── Itemized split ── */
+                    <div className="aes-items">
+                      <div className="aes-field-hint text-tertiary text-xs" style={{ marginBottom: 10 }}>
+                        Add each item and tap who shared it. Set the amount above to include tax &amp; tip
+                        (or leave it blank to use the item total).
+                      </div>
+
+                      {lineItems.map(it => {
+                        const price = parseFloat(it.price) || 0;
+                        const who = it.assigned.filter(id => groupMemberIds.includes(id));
+                        const perEach = who.length > 0 && price > 0 ? price / who.length : 0;
+                        return (
+                          <div key={it.id} className="aes-item">
+                            <div className="aes-item-top">
+                              <input
+                                className="field-input aes-item-name"
+                                placeholder="Item name"
+                                value={it.description}
+                                onChange={e => updateItem(it.id, 'description', e.target.value)}
+                              />
+                              <div className="aes-item-price-wrap">
+                                <span className="aes-value-prefix">$</span>
+                                <input
+                                  className="aes-item-price"
+                                  type="number"
+                                  inputMode="decimal"
+                                  placeholder="0.00"
+                                  min="0"
+                                  value={it.price}
+                                  onChange={e => updateItem(it.id, 'price', e.target.value)}
+                                />
+                              </div>
+                              <button className="aes-item-remove" onClick={() => removeItem(it.id)} aria-label="Remove item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                                </svg>
+                              </button>
+                            </div>
+
+                            <div className="aes-item-assign">
+                              {selectedGroup.members.map(m => {
+                                const u = getUserById(m.userId);
+                                if (!u) return null;
+                                const on = it.assigned.includes(m.userId);
+                                return (
+                                  <button
+                                    key={m.userId}
+                                    className={`aes-assign-chip ${on ? 'on' : ''}`}
+                                    onClick={() => toggleItemAssign(it.id, m.userId)}
+                                  >
+                                    <Avatar user={u} size="sm" />
+                                    <span>{m.userId === currentUser.id ? 'You' : u.name.split(' ')[0]}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {price > 0 && (
+                              who.length > 0 ? (
+                                <div className="aes-item-hint text-tertiary text-xs">
+                                  ${perEach.toFixed(2)} each · {who.length} {who.length === 1 ? 'person' : 'people'}
+                                </div>
+                              ) : (
+                                <div className="aes-item-hint warn">Assign at least one person</div>
+                              )
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      <button className="aes-add-item" onClick={addItem}>+ Add item</button>
+
+                      {/* Summary */}
+                      <div className="aes-items-summary">
+                        <div className="aes-items-row">
+                          <span>Items</span><span>${itemsSum.toFixed(2)}</span>
+                        </div>
+                        {itemsSum > 0 && Math.abs(effectiveTotal - itemsSum) > 0.005 && (
+                          <div className="aes-items-row">
+                            <span>{effectiveTotal >= itemsSum ? 'Tax & tip' : 'Discount'}</span>
+                            <span>${(effectiveTotal - itemsSum).toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="aes-items-row total">
+                          <span>Total</span><span>${effectiveTotal.toFixed(2)}</span>
+                        </div>
+
+                        <div className="aes-items-people">
+                          {groupMemberIds.map(id => {
+                            const u = getUserById(id);
+                            const amt = itemAmountFor(id);
+                            if (!u || amt <= 0) return null;
+                            return (
+                              <div key={id} className="aes-items-person">
+                                <Avatar user={u} size="sm" />
+                                <span className="aes-items-person-name">
+                                  {id === currentUser.id ? 'You' : u.name.split(' ')[0]}
+                                </span>
+                                <span className="aes-items-person-amt">${amt.toFixed(2)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {itemsSum > effectiveTotal + 0.01 && (
+                          <div className="aes-remainder warn">
+                            Items exceed the total — raise the amount above or lower an item price.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -480,7 +711,7 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
 
             <div className="sheet-footer">
               <button className="sheet-cta" onClick={handleSubmit} disabled={!canSubmit}>
-                {isEditing ? 'Save Changes' : 'Add Expense'}{parsedAmount > 0 ? ` · $${parsedAmount.toFixed(2)}` : ''}
+                {isEditing ? 'Save Changes' : 'Add Expense'}{ctaTotal > 0 ? ` · $${ctaTotal.toFixed(2)}` : ''}
               </button>
             </div>
           </motion.div>

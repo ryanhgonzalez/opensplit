@@ -9,10 +9,17 @@ import type { ExpenseCategory } from '../types';
 // so it can be unit-tested against sample receipt text.
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface LineItem {
+  description: string;
+  amount: number;
+}
+
 export interface ParsedReceipt {
   amount?: number;
   description?: string;
   category?: ExpenseCategory;
+  date?: Date;
+  lineItems?: LineItem[];
   rawText: string;
 }
 
@@ -94,6 +101,8 @@ export function parseReceiptText(text: string): Omit<ParsedReceipt, 'rawText'> {
     amount: extractTotal(lines),
     description: extractMerchant(lines),
     category: guessCategory(text),
+    date: extractDate(text),
+    lineItems: extractLineItems(lines),
   };
 }
 
@@ -170,6 +179,73 @@ function toTitleCase(s: string): string {
     .replace(/\b([a-z])/g, (_, c: string) => c.toUpperCase())
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// ─── Date extraction ──────────────────────────────────────────────────────────
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+function makeDate(year: number, month: number, day: number): Date | undefined {
+  if (year < 2000 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  return new Date(year, month - 1, day); // local midnight (no timezone shift)
+}
+
+/** Best-effort receipt date. Assumes US MM/DD ordering for ambiguous numeric dates. */
+function extractDate(text: string): Date | undefined {
+  // ISO: 2026-08-01
+  let m = text.match(/\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b/);
+  if (m) { const d = makeDate(+m[1], +m[2], +m[3]); if (d) return d; }
+
+  // US numeric: MM/DD/YYYY or MM/DD/YY
+  m = text.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\b/);
+  if (m) {
+    const year = +m[3] < 100 ? 2000 + +m[3] : +m[3];
+    const d = makeDate(year, +m[1], +m[2]);
+    if (d) return d;
+  }
+
+  // Month name: "Aug 1, 2026" / "August 01 2026"
+  const monthAlt = MONTHS.join('[a-z]*|') + '[a-z]*';
+  m = text.match(new RegExp(`\\b(${monthAlt})\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(20\\d{2})\\b`, 'i'));
+  if (m) {
+    const mon = MONTHS.indexOf(m[1].slice(0, 3).toLowerCase()) + 1;
+    const d = makeDate(+m[3], mon, +m[2]);
+    if (d) return d;
+  }
+  // "1 Aug 2026"
+  m = text.match(new RegExp(`\\b(\\d{1,2})\\s+(${monthAlt})\\s+(20\\d{2})\\b`, 'i'));
+  if (m) {
+    const mon = MONTHS.indexOf(m[2].slice(0, 3).toLowerCase()) + 1;
+    const d = makeDate(+m[3], mon, +m[1]);
+    if (d) return d;
+  }
+  return undefined;
+}
+
+// ─── Line-item extraction ─────────────────────────────────────────────────────
+
+// Lines whose "name" is really a summary/payment row — never a purchasable item.
+const NON_ITEM = /(sub\s*-?\s*total|subtotal|\btotals?\b|\btax\b|\btip\b|gratuity|balance|amount due|\bdue\b|change|\bcash\b|credit|debit|visa|master|amex|discover|\bcard\b|tender|payment|rounding|service charge|savings|\bqty\b)/i;
+
+/** Extract "name … price" rows as line items (best-effort). */
+function extractLineItems(lines: string[]): LineItem[] {
+  const items: LineItem[] = [];
+  for (const line of lines) {
+    const m = line.match(/^(.*?\S)\s+\$?(\d{1,3}(?:,\d{3})*\.\d{2})\s*$/);
+    if (!m) continue;
+    const price = parseFloat(m[2].replace(/,/g, ''));
+    if (!(price > 0)) continue;
+
+    let name = m[1].trim();
+    if (NON_ITEM.test(name)) continue;                 // skip totals/tax/payment rows
+    if ((name.match(/[a-z]/gi) ?? []).length < 2) continue; // needs real letters
+
+    name = name.replace(/^\d+\s*[xX]?\s+/, '').replace(/\s{2,}/g, ' ').trim(); // drop leading qty
+    if (!name) continue;
+
+    items.push({ description: toTitleCase(name).slice(0, 40), amount: price });
+  }
+  return items;
 }
 
 // Keyword → category. Ordered by specificity; first confident hit wins.

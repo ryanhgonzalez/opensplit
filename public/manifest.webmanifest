@@ -1,6 +1,6 @@
 {
-  "name": "Splitify",
-  "short_name": "Splitify",
+  "name": "OpenSplit",
+  "short_name": "OpenSplit",
   "description": "Split group expenses and settle up with ease.",
   "start_url": "/",
   "scope": "/",
