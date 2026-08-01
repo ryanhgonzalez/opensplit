@@ -101,7 +101,7 @@ export default function SideNav() {
         {/* Logo */}
         <div className="side-nav-logo">
           <div className="side-nav-logo-mark">💸</div>
-          <span className="side-nav-logo-text">Splitify</span>
+          <span className="side-nav-logo-text">OpenSplit</span>
         </div>
 
         {/* Nav items */}

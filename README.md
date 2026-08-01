@@ -1,4 +1,4 @@
-# Splitify
+# OpenSplit
 
 A mobile-first expense splitting PWA inspired by Splitwise, built with React and TypeScript. Features an Apple iOS-inspired design system with light/dark/system theming, fluid animations, and full offline support via local state persistence.
 

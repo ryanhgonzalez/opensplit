@@ -2,7 +2,7 @@ import type { User, Group, Expense, Settlement, Activity } from '../types';
 
 // ─── Schema constants ─────────────────────────────────────────────────────────
 
-export const EXPORT_SCHEMA = 'splitify-export' as const;
+export const EXPORT_SCHEMA = 'opensplit-export' as const;
 export const EXPORT_VERSION = 1 as const;
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ export function downloadExport(data: AppExport): void {
   const slug = data.exportType === 'group'
     ? `group-${(data.meta.groupName ?? 'group').replace(/\s+/g, '_')}`
     : 'full';
-  const filename = `splitify-${slug}-${ts}.json`;
+  const filename = `opensplit-${slug}-${ts}.json`;
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -179,7 +179,7 @@ export function parseAndValidate(json: string): ParseResult {
   try {
     raw = JSON.parse(json);
   } catch {
-    return { ok: false, errors: ['Invalid JSON — the file appears to be corrupted or was not a Splitify export.'], warnings };
+    return { ok: false, errors: ['Invalid JSON — the file appears to be corrupted or was not a OpenSplit export.'], warnings };
   }
 
   if (!isObj(raw)) return { ok: false, errors: ['File does not contain a valid export object.'], warnings };
@@ -188,7 +188,7 @@ export function parseAndValidate(json: string): ParseResult {
     const got = raw.schema ? `"${String(raw.schema)}"` : 'missing';
     return {
       ok: false,
-      errors: [`Unknown file format (schema: ${got}). This does not appear to be a Splitify export file.`],
+      errors: [`Unknown file format (schema: ${got}). This does not appear to be a OpenSplit export file.`],
       warnings,
     };
   }
@@ -200,13 +200,13 @@ export function parseAndValidate(json: string): ParseResult {
   if (raw.version > EXPORT_VERSION) {
     return {
       ok: false,
-      errors: [`This file was created with a newer version of Splitify (v${raw.version}). Please update the app to import it.`],
+      errors: [`This file was created with a newer version of OpenSplit (v${raw.version}). Please update the app to import it.`],
       warnings,
     };
   }
 
   if (raw.version < EXPORT_VERSION) {
-    warnings.push(`This file was created with an older version of Splitify (v${raw.version}). It will be migrated automatically.`);
+    warnings.push(`This file was created with an older version of OpenSplit (v${raw.version}). It will be migrated automatically.`);
   }
 
   if (!isObj(raw.data)) {

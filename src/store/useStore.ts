@@ -545,7 +545,7 @@ export const useStore = create<AppStore>()(
         },
       }),
       {
-        name: 'splitify-v2',
+        name: 'opensplit-v2',
         storage: persistStorage,
         partialize: (state) => ({
           hasOnboarded:   state.hasOnboarded,

@@ -48,7 +48,7 @@ export default function Onboarding() {
 
         {/* Heading */}
         <motion.div className="ob-heading" variants={item}>
-          <h1 className="ob-title">Welcome to Splitify</h1>
+          <h1 className="ob-title">Welcome to OpenSplit</h1>
           <p className="ob-subtitle">Split expenses with anyone, settle up without the awkwardness.</p>
         </motion.div>
 

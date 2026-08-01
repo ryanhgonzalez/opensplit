@@ -394,7 +394,7 @@ export default function ExportImportSheet({
                   ) : (
                     <>
                       <p className="eis-section-desc">
-                        Upload a previously exported Splitify JSON file to restore or merge your data.
+                        Upload a previously exported OpenSplit JSON file to restore or merge your data.
                       </p>
 
                       {/* Drop zone */}
