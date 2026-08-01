@@ -239,7 +239,10 @@
 /* FAB */
 .fab-fixed {
   position: fixed;
-  bottom: calc(var(--bottom-nav-height) + 28px);
+  /* Include the safe-area inset so the FAB rides up with the bottom nav in PWA/standalone
+     mode (where env(safe-area-inset-bottom) is non-zero); otherwise it collides with the
+     nav. Matches the nav's own bottom offset + page-content padding. */
+  bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 28px);
   right: calc(50vw - 215px + 20px);
   z-index: 150;
 }
