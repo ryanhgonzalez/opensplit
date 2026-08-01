@@ -343,15 +343,33 @@ export const useStore = create<AppStore>()(
             'updateGroup',
           ),
 
-        deleteGroup: (id) =>
+        deleteGroup: (id) => {
+          const { currentUserId, groups, expenses, settlements, activities } = get();
+
+          const remainingGroups = groups.filter((g) => g.id !== id);
+          const remainingExpenses = expenses.filter((e) => e.groupId !== id);
+          const remainingSettlements = settlements.filter((s) => s.groupId !== id);
+          const remainingActivities = activities.filter((a) => a.groupId !== id);
+
+          const { friendBalances, groups: recalcedGroups } = recalcAll(
+            remainingExpenses,
+            remainingSettlements,
+            remainingGroups,
+            currentUserId,
+          );
+
           set(
             {
-              groups: get().groups.filter((g) => g.id !== id),
-              expenses: get().expenses.filter((e) => e.groupId !== id),
+              groups: recalcedGroups,
+              expenses: remainingExpenses,
+              settlements: remainingSettlements,
+              activities: remainingActivities,
+              friendBalances,
             },
             false,
             'deleteGroup',
-          ),
+          );
+        },
 
         addGroupMember: (groupId, userId) =>
           set(
