@@ -1,3 +1,59 @@
+/* Receipt scan */
+.aes-scan {
+  margin-bottom: 20px;
+}
+
+.aes-scan-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  border: 1px dashed var(--glass-border-strong);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.aes-scan-btn:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+}
+
+.aes-scan-btn:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.aes-scan-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--glass-border-strong);
+  border-top-color: var(--accent-teal);
+  border-radius: 50%;
+  animation: aes-scan-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes aes-scan-spin {
+  to { transform: rotate(360deg); }
+}
+
+.aes-scan-msg {
+  margin-top: 8px;
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.aes-scan-msg.ok { color: var(--accent-green); }
+.aes-scan-msg.error { color: var(--accent-red); }
+
 /* Amount hero */
 .aes-amount-hero {
   display: flex;

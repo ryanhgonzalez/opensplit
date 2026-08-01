@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore, selectCurrentUser } from '../store';
 import { buildSplit, round } from '../lib/calculations';
@@ -46,6 +46,13 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
   const [paidBy, setPaidBy] = useState(editExpense?.paidBy ?? currentUser.id);
   const [splitType, setSplitType] = useState<SplitType>(initSplitType(editExpense));
   const [participants, setParticipants] = useState<Participant[]>([]);
+
+  // Receipt scanning (client-side OCR — fills a draft the user reviews before saving)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanned, setScanned] = useState(false);
 
   const selectedGroup = useMemo(() => groups.find(g => g.id === groupId), [groups, groupId]);
   const getUserById = (id: string) => users.find(u => u.id === id);
@@ -128,6 +135,37 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
     setParticipants(prev => prev.map(p => ({ ...p, value: '' })));
   };
 
+  const handleReceiptSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file later
+    if (!file) return;
+
+    setScanning(true);
+    setScanError(null);
+    setScanProgress(0);
+    setScanned(false);
+    try {
+      const { scanReceipt } = await import('../lib/receiptScanner');
+      const result = await scanReceipt(file, setScanProgress);
+
+      let filledAny = false;
+      if (result.amount && result.amount > 0) { setAmountStr(String(result.amount)); filledAny = true; }
+      if (result.description) { setDescription(result.description); filledAny = true; }
+      if (result.category) { setCategory(result.category); filledAny = true; }
+
+      if (!filledAny) {
+        setScanError("Couldn't read that receipt. Try a clearer, well-lit photo — or enter the details manually.");
+      } else {
+        setScanned(true);
+        if (!result.amount) setScanError("Couldn't find the total — please enter the amount manually.");
+      }
+    } catch {
+      setScanError('Something went wrong scanning the receipt. Please enter the details manually.');
+    } finally {
+      setScanning(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (!canSubmit) return;
 
@@ -173,6 +211,10 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
     setPaidBy(editExpense?.paidBy ?? currentUser.id);
     setSplitType(initSplitType(editExpense));
     setParticipants([]);
+    setScanning(false);
+    setScanProgress(0);
+    setScanError(null);
+    setScanned(false);
     onClose();
   };
 
@@ -205,6 +247,45 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
             </div>
 
             <div className="sheet-body">
+              {/* Receipt scan (client-side OCR) — pre-fills an editable draft */}
+              {!isEditing && (
+                <div className="aes-scan">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    hidden
+                    onChange={handleReceiptSelected}
+                  />
+                  <button
+                    type="button"
+                    className="aes-scan-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={scanning}
+                  >
+                    {scanning ? (
+                      <>
+                        <span className="aes-scan-spinner" aria-hidden />
+                        Reading receipt… {Math.round(scanProgress * 100)}%
+                      </>
+                    ) : (
+                      <>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="2" />
+                        </svg>
+                        Scan receipt
+                      </>
+                    )}
+                  </button>
+                  {scanError && <div className="aes-scan-msg error">{scanError}</div>}
+                  {scanned && !scanError && (
+                    <div className="aes-scan-msg ok">Filled from receipt — double-check the details below.</div>
+                  )}
+                </div>
+              )}
+
               {/* Amount — hero input */}
               <div className="aes-amount-hero">
                 <span className="aes-currency-symbol">$</span>
