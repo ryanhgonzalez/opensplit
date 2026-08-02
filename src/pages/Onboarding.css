@@ -63,6 +63,10 @@
   display: flex;
   flex-direction: column;
   gap: 32px;
+  /* Never taller than the available viewport — scroll inside the card
+     instead of overflowing (and getting clipped) past the screen edges. */
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 /* Logo */
@@ -198,6 +202,183 @@
 
 .ob-cta:not(:disabled):hover {
   opacity: 0.9;
+}
+
+/* Secondary action — import / skip */
+.ob-secondary {
+  width: 100%;
+  padding: 13px;
+  border-radius: 14px;
+  background: var(--fill-secondary);
+  border: 1px solid var(--glass-border-strong);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.ob-secondary:hover {
+  background: var(--fill-hover);
+}
+
+.ob-secondary-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-align: center;
+  line-height: 1.45;
+  margin-top: -4px;
+}
+
+.ob-import-error {
+  font-size: 13px;
+  color: var(--danger, #ef4444);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* "or" divider */
+.ob-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.ob-divider::before,
+.ob-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--glass-border);
+}
+
+/* First-group step */
+.ob-group-preview {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 20px;
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+}
+
+.ob-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ob-emoji-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--fill-secondary);
+  border: 1px solid var(--glass-border);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.ob-emoji-dot.active {
+  border-color: rgba(124, 58, 237, 0.7);
+  background: var(--fill-hover);
+}
+
+.ob-color-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+
+.ob-color-dot.active {
+  transform: scale(1.05);
+}
+
+.ob-type-chip {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--fill-secondary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.ob-type-chip.active {
+  border-color: rgba(124, 58, 237, 0.7);
+  background: var(--fill-hover);
+  color: var(--text-primary);
+}
+
+.ob-people-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ob-person-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 999px;
+  background: var(--fill-secondary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ob-person-chip button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: var(--fill-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ob-person-add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.ob-person-add-btn {
+  padding: 0 18px;
+  border-radius: 14px;
+  background: var(--fill-secondary);
+  border: 1px solid var(--glass-border-strong);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.ob-person-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Mobile adjustments */

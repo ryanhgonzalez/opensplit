@@ -261,9 +261,11 @@ export function remapForNewGroup(
     if (existing) {
       idMap.set(u.id, existing.id);
     } else {
-      const newId = crypto.randomUUID();
-      idMap.set(u.id, newId);
-      newUsers.push({ ...u, id: newId });
+      // Keep the original ID so re-importing the same group matches this
+      // person by ID instead of creating a duplicate. We only reach here when
+      // no existing user matched, so the ID can't collide.
+      idMap.set(u.id, u.id);
+      newUsers.push({ ...u });
     }
   }
 
