@@ -252,6 +252,161 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* ── Danger menu item ───────────────────────────────────────────────────────── */
+.ams-menu-danger .ams-menu-icon {
+  color: var(--accent-red);
+  border-color: color-mix(in srgb, var(--accent-red) 30%, transparent);
+  background: color-mix(in srgb, var(--accent-red) 10%, transparent);
+}
+
+.ams-menu-danger .ams-menu-label {
+  color: var(--accent-red);
+}
+
+.ams-menu-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-red) 10%, transparent);
+}
+
+/* ── Full Data Wipe confirmation ────────────────────────────────────────────── */
+.ams-wipe-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: var(--bg-overlay-dim);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.ams-wipe-modal {
+  width: 100%;
+  max-width: 380px;
+  background: var(--bg-panel);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 24px;
+  box-shadow: var(--shadow-lg);
+  padding: 28px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.ams-wipe-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-red);
+  background: color-mix(in srgb, var(--accent-red) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-red) 30%, transparent);
+  margin-bottom: 16px;
+}
+
+.ams-wipe-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+  margin-bottom: 8px;
+}
+
+.ams-wipe-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.ams-wipe-text strong {
+  color: var(--text-primary);
+}
+
+.ams-wipe-label {
+  align-self: flex-start;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.ams-wipe-label strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.ams-wipe-input {
+  width: 100%;
+  background: var(--fill-primary);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 15px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 150ms ease, background 150ms ease;
+  margin-bottom: 18px;
+}
+
+.ams-wipe-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.ams-wipe-input:focus {
+  border-color: color-mix(in srgb, var(--accent-red) 70%, transparent);
+  background: var(--fill-hover);
+}
+
+.ams-wipe-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.ams-wipe-cancel,
+.ams-wipe-delete {
+  flex: 1;
+  padding: 13px;
+  border-radius: 12px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, opacity 150ms ease;
+}
+
+.ams-wipe-cancel {
+  background: var(--fill-primary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+.ams-wipe-cancel:hover {
+  background: var(--fill-hover);
+}
+
+.ams-wipe-delete {
+  background: var(--accent-red);
+  border: 1px solid transparent;
+  color: #fff;
+}
+
+.ams-wipe-delete:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ams-wipe-delete:not(:disabled):hover {
+  background: color-mix(in srgb, var(--accent-red) 88%, #000);
+}
+
 /* ── Desktop: offset overlay past the sidebar ───────────────────────────────── */
 @media (min-width: 1024px) {
   .ams-overlay {

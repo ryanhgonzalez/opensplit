@@ -79,6 +79,9 @@ export interface AppStore {
   // ── Import actions ──
   restoreAllData: (payload: ExportPayload) => void;
   mergeImportData: (payload: ExportPayload) => ImportStats;
+
+  // ── Danger zone ──
+  wipeAllData: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -561,6 +564,25 @@ export const useStore = create<AppStore>()(
             settlementsAdded: newSettlements.length,
           };
         },
+
+        // ── Danger zone ────────────────────────────────────────────────────────
+
+        wipeAllData: () =>
+          set(
+            {
+              hasOnboarded: false,
+              theme: 'system' as ThemeMode,
+              currentUserId: '',
+              users: [],
+              groups: [],
+              expenses: [],
+              settlements: [],
+              activities: [],
+              friendBalances: {},
+            },
+            false,
+            'wipeAllData',
+          ),
       }),
       {
         name: 'opensplit-v2',

@@ -18,10 +18,28 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
 
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
+  const wipeAllData = useStore((s) => s.wipeAllData);
 
   const [showDataSheet, setShowDataSheet] = useState(false);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
+  const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+  const [wipeNameInput, setWipeNameInput] = useState('');
+
+  const wipeNameMatches =
+    currentUser.name.trim().length > 0 &&
+    wipeNameInput.trim().toLowerCase() === currentUser.name.trim().toLowerCase();
+
+  const closeWipeConfirm = () => {
+    setShowWipeConfirm(false);
+    setWipeNameInput('');
+  };
+
+  const handleWipe = () => {
+    if (!wipeNameMatches) return;
+    // Resets hasOnboarded → the app returns to the onboarding screen.
+    wipeAllData();
+  };
 
   const myGroups = groups.filter((g) =>
     g.members.some((m) => m.userId === currentUser.id),
@@ -194,6 +212,22 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Full Data Wipe */}
+                <button
+                  className="ams-menu-item ams-menu-danger"
+                  onClick={() => setShowWipeConfirm(true)}
+                >
+                  <div className="ams-menu-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M3 6H5H21M8 6V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V6M19 6L18.1671 19.1264C18.0723 20.6999 16.7622 22 15.1847 22H8.81535C7.23784 22 5.92769 20.6999 5.83286 19.1264L5 6M10 11V17M14 11V17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <span className="ams-menu-label">Full Data Wipe</span>
+                  <svg className="ams-menu-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
               </div>
 
               <button className="ams-close" onClick={onClose}>
@@ -208,6 +242,62 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
       <AnimatePresence>
         {showDataSheet && (
           <ExportImportSheet open={showDataSheet} onClose={() => setShowDataSheet(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Full Data Wipe confirmation */}
+      <AnimatePresence>
+        {showWipeConfirm && (
+          <motion.div
+            className="ams-wipe-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={closeWipeConfirm}
+          >
+            <motion.div
+              className="ams-wipe-modal"
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 340 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="ams-wipe-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 6H5H21M8 6V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V6M19 6L18.1671 19.1264C18.0723 20.6999 16.7622 22 15.1847 22H8.81535C7.23784 22 5.92769 20.6999 5.83286 19.1264L5 6M10 11V17M14 11V17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <h3 className="ams-wipe-title">Full Data Wipe</h3>
+              <p className="ams-wipe-text">
+                This permanently deletes <strong>all</strong> of your groups, expenses, people, and
+                activity, and resets OpenSplit to its first-launch state. This cannot be undone.
+              </p>
+              <label className="ams-wipe-label" htmlFor="ams-wipe-input">
+                Type <strong>{currentUser.name}</strong> to confirm
+              </label>
+              <input
+                id="ams-wipe-input"
+                className="ams-wipe-input"
+                type="text"
+                placeholder="Your name…"
+                value={wipeNameInput}
+                onChange={(e) => setWipeNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleWipe()}
+                autoFocus
+                autoComplete="off"
+              />
+              <div className="ams-wipe-actions">
+                <button className="ams-wipe-cancel" onClick={closeWipeConfirm}>
+                  Cancel
+                </button>
+                <button className="ams-wipe-delete" onClick={handleWipe} disabled={!wipeNameMatches}>
+                  Delete Everything
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </>
