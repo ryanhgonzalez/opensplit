@@ -136,11 +136,6 @@ export default function Onboarding() {
             animate="show"
             exit={{ opacity: 0, y: -12, transition: { duration: 0.2 } }}
           >
-            {/* Logo mark */}
-            <motion.div className="ob-logo-wrap" variants={item}>
-              <div className="ob-logo">💰</div>
-            </motion.div>
-
             {/* Heading */}
             <motion.div className="ob-heading" variants={item}>
               <h1 className="ob-title">Welcome to OpenSplit</h1>
