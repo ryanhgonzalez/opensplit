@@ -13,6 +13,7 @@ import type {
   SettledActivity,
 } from '../types';
 import type { ExportPayload, ImportStats } from '../lib/dataExport';
+import { round } from '../lib/calculations';
 import { getShareForUser } from '../utils/expense';
 
 // ─── Action input types ───────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ export interface AppStore {
 
   // ── Settlement actions ──
   addSettlement: (input: AddSettlementInput) => Settlement;
+  deleteSettlement: (id: string) => void;
 
   // ── User actions ──
   addUser: (input: AddUserInput) => User;
@@ -144,9 +146,9 @@ function recalcAll(
 
   for (const s of settlements) {
     if (s.fromUserId === currentUserId) {
-      friendBalances[s.toUserId] = (friendBalances[s.toUserId] ?? 0) + s.amount;
+      friendBalances[s.toUserId] = round((friendBalances[s.toUserId] ?? 0) + s.amount);
     } else if (s.toUserId === currentUserId) {
-      friendBalances[s.fromUserId] = (friendBalances[s.fromUserId] ?? 0) - s.amount;
+      friendBalances[s.fromUserId] = round((friendBalances[s.fromUserId] ?? 0) - s.amount);
     }
   }
 
@@ -160,7 +162,11 @@ function recalcAll(
       else if (s.toUserId === currentUserId) yourBalance -= s.amount;
     }
 
-    return { ...g, yourBalance, totalSpent: gExp.reduce((acc, e) => acc + e.amount, 0) };
+    return {
+      ...g,
+      yourBalance: round(yourBalance),
+      totalSpent: round(gExp.reduce((acc, e) => acc + e.amount, 0)),
+    };
   });
 
   return { friendBalances, groups: updatedGroups };
@@ -403,10 +409,11 @@ export const useStore = create<AppStore>()(
           const { currentUserId, settlements, groups, activities, friendBalances } = get();
           const id = uid();
           const now = new Date();
-          const settlement: Settlement = { ...input, id, createdAt: now };
+          const amount = round(input.amount);
+          const settlement: Settlement = { ...input, amount, id, createdAt: now };
 
           const currentBalance = friendBalances[input.fromUserId === currentUserId ? input.toUserId : input.fromUserId] ?? 0;
-          const remainingAfter = Math.abs(currentBalance) - input.amount;
+          const remainingAfter = Math.abs(currentBalance) - amount;
           const activityType: 'payment' | 'settled' = remainingAfter <= 0.005 ? 'settled' : 'payment';
 
           const activity: PaymentActivity | SettledActivity = {
@@ -416,29 +423,29 @@ export const useStore = create<AppStore>()(
             settlementId: id,
             fromUserId: input.fromUserId,
             toUserId: input.toUserId,
-            amount: input.amount,
+            amount,
             groupId: input.groupId,
             date: now,
           };
 
           const balanceDelta =
             input.toUserId === currentUserId
-              ? -input.amount
+              ? -amount
               : input.fromUserId === currentUserId
-                ? input.amount
+                ? amount
                 : 0;
 
           const updatedGroups = groups.map((g) =>
             g.id !== input.groupId
               ? g
-              : { ...g, yourBalance: g.yourBalance + balanceDelta, lastActivity: now },
+              : { ...g, yourBalance: round(g.yourBalance + balanceDelta), lastActivity: now },
           );
 
           const updatedBalances = { ...friendBalances };
           if (input.fromUserId === currentUserId) {
-            updatedBalances[input.toUserId] = (updatedBalances[input.toUserId] ?? 0) + input.amount;
+            updatedBalances[input.toUserId] = round((updatedBalances[input.toUserId] ?? 0) + amount);
           } else if (input.toUserId === currentUserId) {
-            updatedBalances[input.fromUserId] = (updatedBalances[input.fromUserId] ?? 0) - input.amount;
+            updatedBalances[input.fromUserId] = round((updatedBalances[input.fromUserId] ?? 0) - amount);
           }
 
           set(
@@ -453,6 +460,34 @@ export const useStore = create<AppStore>()(
           );
 
           return settlement;
+        },
+
+        /** Undo a payment that was marked complete — balances rewind to before it. */
+        deleteSettlement: (id) => {
+          const { currentUserId, settlements, groups, expenses, activities } = get();
+          if (!settlements.some((s) => s.id === id)) return;
+
+          const remaining = settlements.filter((s) => s.id !== id);
+          const { friendBalances, groups: recalcedGroups } = recalcAll(
+            expenses,
+            remaining,
+            groups,
+            currentUserId,
+          );
+
+          set(
+            {
+              settlements: remaining,
+              // Drop the payment / settled entry this settlement produced.
+              activities: activities.filter(
+                (a) => !((a.type === 'payment' || a.type === 'settled') && a.settlementId === id),
+              ),
+              groups: recalcedGroups,
+              friendBalances,
+            },
+            false,
+            'deleteSettlement',
+          );
         },
 
         // ── Users ────────────────────────────────────────────────────────────

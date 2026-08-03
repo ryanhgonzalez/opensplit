@@ -1,0 +1,248 @@
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay-dim);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 500;
+  display: flex;
+  align-items: flex-end;
+}
+
+.settle-modal {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  border-radius: 32px 32px 0 0 !important;
+  padding: 16px 24px 40px;
+  border-bottom: none !important;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.modal-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-prominent);
+  margin: 0 auto 24px;
+}
+
+.modal-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.modal-avatars {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.modal-arrow {
+  color: var(--text-secondary);
+  display: flex;
+}
+
+.modal-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  text-align: center;
+}
+
+.modal-group-chip {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--fill-primary);
+  border: 1px solid var(--glass-border);
+}
+
+.modal-amount {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 28px;
+}
+
+.amount-currency {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.amount-value {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+/* Editable amount — lets a payment be marked complete for part of the balance */
+.modal-amount-field {
+  margin-bottom: 28px;
+}
+
+.modal-amount-field .modal-amount {
+  margin-bottom: 8px;
+}
+
+.amount-input {
+  font-family: var(--font);
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px dashed var(--border-prominent);
+  padding: 0 2px 2px;
+  min-width: 2ch;
+  max-width: 100%;
+  text-align: center;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.amount-input:focus {
+  border-bottom-color: var(--accent-green);
+}
+
+.amount-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.amount-full-btn {
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  background: var(--accent-blue-bg);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.amount-full-btn:hover {
+  background: var(--glass-bg-hover);
+}
+
+/* Payment methods */
+.payment-methods {
+  margin-bottom: 28px;
+}
+
+.payment-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.payment-method-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font);
+}
+
+.payment-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.payment-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.payment-method-btn.active .payment-label {
+  color: var(--text-primary);
+}
+
+/* Modal actions */
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-cancel {
+  flex: 0 0 auto;
+  padding: 14px 20px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.modal-confirm {
+  flex: 1;
+  padding: 14px 20px;
+  border-radius: var(--radius-full);
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  box-shadow: 0 8px 24px rgba(52, 211, 153, 0.3);
+  transition: box-shadow var(--transition-fast);
+}
+
+.modal-confirm:hover:not(:disabled) {
+  box-shadow: 0 12px 32px rgba(52, 211, 153, 0.4);
+}
+
+.modal-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Success state */
+.settle-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0 40px;
+  text-align: center;
+}
+
+.success-checkmark {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.85), rgba(45, 212, 191, 0.7));
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 32px rgba(52, 211, 153, 0.4);
+}

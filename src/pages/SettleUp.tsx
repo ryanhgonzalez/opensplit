@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
 import Avatar from '../components/Avatar';
-import { useStore, selectCurrentUser, selectOverallBalance, AddSettlementInput } from '../store';
+import SettleModal, { SettleMode } from '../components/SettleModal';
+import { useStore, selectCurrentUser, selectOverallBalance } from '../store';
 import { formatCurrency } from '../utils';
+import type { PaymentMethod } from '../types';
 import './SettleUp.css';
 
 const containerVariants = {
@@ -16,158 +18,15 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
 };
 
-type PaymentMethod = 'venmo' | 'cashapp' | 'zelle' | 'cash';
-
-const paymentMethods: { id: PaymentMethod; label: string; icon: string; color: string }[] = [
-  { id: 'venmo', label: 'Venmo', icon: 'V', color: '#3d95ce' },
-  { id: 'cashapp', label: 'Cash App', icon: '$', color: '#00c244' },
-  { id: 'zelle', label: 'Zelle', icon: 'Z', color: '#6d1ed4' },
-  { id: 'cash', label: 'Cash', icon: '💵', color: '#10b981' },
-];
-
-interface SettleModalProps {
-  userId: string;
+interface ActiveModal {
+  fromUserId: string;
+  toUserId: string;
   amount: number;
-  isReceiving: boolean;
-  onClose: () => void;
-  onConfirm: (method: PaymentMethod) => void;
-}
-
-function SettleModal({ userId, amount, isReceiving, onClose, onConfirm }: SettleModalProps) {
-  const [method, setMethod] = useState<PaymentMethod>('venmo');
-  const [confirmed, setConfirmed] = useState(false);
-  const users = useStore((s) => s.users);
-  const currentUser = useStore(selectCurrentUser)!;
-  const user = users.find((u) => u.id === userId);
-  if (!user) return null;
-
-  const handleConfirm = () => {
-    if (!isReceiving) onConfirm(method);
-    setConfirmed(true);
-    setTimeout(onClose, 1800);
-  };
-
-  return (
-    <motion.div
-      className="modal-overlay"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        className="settle-modal glass-strong"
-        initial={{ y: '100%', opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: '100%', opacity: 0 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-handle" />
-
-        <AnimatePresence mode="wait">
-          {confirmed ? (
-            <motion.div
-              key="success"
-              className="settle-success"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', damping: 20 }}
-            >
-              <motion.div
-                className="success-checkmark"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.1, type: 'spring', damping: 15 }}
-              >
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17L4 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </motion.div>
-              <h3>{isReceiving ? `Reminder sent to ${user.name}` : 'Payment recorded!'}</h3>
-              <p className="text-secondary text-sm">
-                {isReceiving
-                  ? `You'll be notified when ${user.name} pays`
-                  : `${formatCurrency(amount)} marked as settled`}
-              </p>
-            </motion.div>
-          ) : (
-            <motion.div key="form" initial={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="modal-header">
-                <div className="modal-avatars">
-                  <Avatar user={currentUser} size="lg" showRing />
-                  <div className="modal-arrow">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <path d="M5 12H19M14 7L19 12L14 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                  <Avatar user={user} size="lg" showRing />
-                </div>
-                <h2 className="modal-title">{isReceiving ? `Remind ${user.name}` : `Pay ${user.name}`}</h2>
-                <p className="text-secondary text-sm">
-                  {isReceiving
-                    ? `${user.name} owes you ${formatCurrency(amount)}`
-                    : `You owe ${user.name} ${formatCurrency(amount)}`}
-                </p>
-              </div>
-
-              <div className="modal-amount">
-                <span className="amount-currency">$</span>
-                <span className="amount-value">{amount.toFixed(2)}</span>
-              </div>
-
-              {!isReceiving && (
-                <div className="payment-methods">
-                  <p className="text-sm text-secondary" style={{ marginBottom: 10 }}>Pay via</p>
-                  <div className="payment-grid">
-                    {paymentMethods.map((pm) => (
-                      <button
-                        key={pm.id}
-                        className={`payment-method-btn ${method === pm.id ? 'active' : ''}`}
-                        onClick={() => setMethod(pm.id)}
-                        style={method === pm.id ? { borderColor: `${pm.color}60`, background: `${pm.color}18` } : {}}
-                      >
-                        <div className="payment-icon" style={{ background: `${pm.color}25`, border: `1px solid ${pm.color}40` }}>
-                          <span style={{ fontSize: pm.icon.length > 1 ? 16 : 14, fontWeight: 800, color: pm.color }}>
-                            {pm.icon}
-                          </span>
-                        </div>
-                        <span className="payment-label">{pm.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="modal-actions">
-                <button className="modal-cancel glass-btn" onClick={onClose}>Cancel</button>
-                <motion.button
-                  className="modal-confirm"
-                  style={{
-                    background: isReceiving
-                      ? 'linear-gradient(135deg, rgba(96,165,250,0.8), rgba(124,58,237,0.7))'
-                      : 'linear-gradient(135deg, rgba(52,211,153,0.85), rgba(45,212,191,0.7))',
-                  }}
-                  onClick={handleConfirm}
-                  whileTap={{ scale: 0.97 }}
-                >
-                  {isReceiving ? 'Send Reminder' : `Pay ${formatCurrency(amount)}`}
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </motion.div>
-  );
+  mode: SettleMode;
 }
 
 export default function SettleUp() {
-  const [activeModal, setActiveModal] = useState<{
-    userId: string;
-    amount: number;
-    isReceiving: boolean;
-  } | null>(null);
+  const [activeModal, setActiveModal] = useState<ActiveModal | null>(null);
 
   const currentUser = useStore(selectCurrentUser)!;
   const balance = useStore(selectOverallBalance);
@@ -176,19 +35,24 @@ export default function SettleUp() {
 
   const getUserById = (id: string) => users.find((u) => u.id === id);
 
-  const handleConfirm = (method: PaymentMethod) => {
-    if (!activeModal || activeModal.isReceiving) return;
+  /**
+   * Records the payment against the overall balance with that person.
+   *
+   * Deliberately carries no `groupId`: this page settles the running total across
+   * everything, so it is not attributable to one group. A group's own balance only
+   * moves when the payment is marked complete from inside that group.
+   */
+  const handleConfirm = (amount: number, method: PaymentMethod) => {
+    if (!activeModal || activeModal.mode === 'remind') return;
 
-    const input: AddSettlementInput = {
-      fromUserId: currentUser.id,
-      toUserId: activeModal.userId,
-      amount: activeModal.amount,
+    addSettlement({
+      fromUserId: activeModal.fromUserId,
+      toUserId: activeModal.toUserId,
+      amount,
       currency: 'USD',
       date: new Date(),
       paymentMethod: method,
-    };
-
-    addSettlement(input);
+    });
   };
 
   return (
@@ -247,16 +111,27 @@ export default function SettleUp() {
                           <span style={{ fontWeight: 500, fontSize: 15 }}>{friend.name}</span>
                           <span className="text-sm text-secondary">owes you</span>
                         </div>
-                        <span className="text-green" style={{ fontWeight: 700, fontSize: 17, marginRight: 12 }}>
-                          +{formatCurrency(b.amount)}
-                        </span>
-                        <motion.button
-                          className="remind-btn"
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => setActiveModal({ userId: b.userId, amount: b.amount, isReceiving: true })}
-                        >
-                          Remind
-                        </motion.button>
+                        <span className="text-green settle-amount">+{formatCurrency(b.amount)}</span>
+                        <div className="settle-actions">
+                          <motion.button
+                            className="remind-btn"
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setActiveModal({
+                              fromUserId: b.userId, toUserId: currentUser.id, amount: b.amount, mode: 'remind',
+                            })}
+                          >
+                            Remind
+                          </motion.button>
+                          <motion.button
+                            className="pay-btn"
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setActiveModal({
+                              fromUserId: b.userId, toUserId: currentUser.id, amount: b.amount, mode: 'settle',
+                            })}
+                          >
+                            Mark Paid
+                          </motion.button>
+                        </div>
                       </div>
                     </GlassCard>
                   );
@@ -281,16 +156,18 @@ export default function SettleUp() {
                           <span style={{ fontWeight: 500, fontSize: 15 }}>{friend.name}</span>
                           <span className="text-sm text-secondary">you owe</span>
                         </div>
-                        <span className="text-red" style={{ fontWeight: 700, fontSize: 17, marginRight: 12 }}>
-                          -{formatCurrency(b.amount)}
-                        </span>
-                        <motion.button
-                          className="pay-btn"
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => setActiveModal({ userId: b.userId, amount: b.amount, isReceiving: false })}
-                        >
-                          Pay
-                        </motion.button>
+                        <span className="text-red settle-amount">-{formatCurrency(b.amount)}</span>
+                        <div className="settle-actions">
+                          <motion.button
+                            className="pay-btn"
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setActiveModal({
+                              fromUserId: currentUser.id, toUserId: b.userId, amount: b.amount, mode: 'settle',
+                            })}
+                          >
+                            Pay
+                          </motion.button>
+                        </div>
                       </div>
                     </GlassCard>
                   );
@@ -310,9 +187,10 @@ export default function SettleUp() {
       <AnimatePresence>
         {activeModal && (
           <SettleModal
-            userId={activeModal.userId}
+            fromUserId={activeModal.fromUserId}
+            toUserId={activeModal.toUserId}
             amount={activeModal.amount}
-            isReceiving={activeModal.isReceiving}
+            mode={activeModal.mode}
             onClose={() => setActiveModal(null)}
             onConfirm={handleConfirm}
           />

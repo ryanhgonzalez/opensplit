@@ -90,11 +90,133 @@
   gap: 10px;
   padding: 12px 16px;
   border-radius: var(--radius-md);
+  /* The settle action wraps below rather than crushing the row on narrow screens. */
+  flex-wrap: wrap;
 }
 
 .gd-settlement-info {
-  flex: 1;
+  flex: 1 1 90px;
   min-width: 0;
+}
+
+.gd-settle-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.8), rgba(45, 212, 191, 0.7));
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.22);
+  transition: box-shadow var(--transition-fast);
+}
+
+.gd-settle-btn:hover {
+  box-shadow: 0 6px 18px rgba(52, 211, 153, 0.32);
+}
+
+/* Completed payment rows */
+.gd-payment-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+
+.gd-payment-check {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent-green);
+  background: var(--accent-green-bg);
+  border: 1px solid rgba(52, 211, 153, 0.28);
+}
+
+.gd-payment-info {
+  flex: 1 1 110px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gd-payment-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.gd-payment-amount {
+  font-size: 15px;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.gd-payment-undo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--fill-primary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.gd-payment-undo:hover {
+  background: var(--fill-hover);
+  color: var(--text-primary);
+}
+
+.gd-payment-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.gd-payment-cancel,
+.gd-payment-undo-confirm {
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.gd-payment-cancel {
+  background: var(--fill-primary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+}
+
+.gd-payment-cancel:hover {
+  background: var(--fill-hover);
+}
+
+.gd-payment-undo-confirm {
+  background: var(--accent-red-bg);
+  border: 1px solid rgba(255, 69, 58, 0.3);
+  color: var(--accent-red);
+}
+
+.gd-payment-undo-confirm:hover {
+  background: rgba(255, 69, 58, 0.22);
 }
 
 /* Expense rows */
@@ -236,12 +358,18 @@
   }
 
   .gd-section-balances .px-5,
-  .gd-section-settlements .px-5 {
+  .gd-section-settlements .px-5,
+  .gd-section-payments .px-5 {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
 
   .gd-section-settlements {
+    grid-column: 1;
+    margin-bottom: 20px !important;
+  }
+
+  .gd-section-payments {
     grid-column: 1;
     margin-bottom: 0 !important;
   }

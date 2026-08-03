@@ -8,7 +8,7 @@ A mobile-first expense splitting PWA inspired by Splitwise, built with React and
 - **Groups** — Create and manage expense groups with emoji, color coding, and member management
 - **People** — Track individual balances across all shared groups
 - **Activity** — Chronological feed of all expenses and payments
-- **Settle Up** — Record payments via Venmo, Cash App, Zelle, or cash
+- **Settle Up** — Mark payments complete in either direction (money you paid or money you received), in full or partially, via Venmo, Cash App, Zelle, or cash. Balances, group totals, and the activity feed update immediately. Payments marked complete from Settle Up clear the overall balance with that person; to clear a specific group's balance, mark it complete from inside that group, where completed payments are also listed and can be undone.
 - **Insights** — Spending breakdowns by category, monthly trends, and group contribution charts
 - **Group PDF Reports** — Export a full expense report for any group as a PDF
 - **Data Import / Export** — Back up and restore all app data as JSON

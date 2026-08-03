@@ -3,7 +3,7 @@
  * No React, Zustand, or UI dependencies — safe to test in isolation.
  */
 
-import type { Expense, ExpenseSplit, SplitEntry, SplitType } from '../types';
+import type { Expense, ExpenseSplit, Settlement, SplitEntry, SplitType } from '../types';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -21,6 +21,8 @@ export interface SettlementTransaction {
 export interface GroupSnapshot {
   expenses: Expense[];
   memberIds: string[];
+  /** Payments already marked complete. Omit for balances before any settling. */
+  settlements?: Settlement[];
 }
 
 // ─── Currency arithmetic ──────────────────────────────────────────────────────
@@ -205,7 +207,8 @@ export function netForUser(expenses: Expense[], userId: string): number {
  *
  * Algorithm: for each expense, the payer is credited the amount they fronted for
  * others (total paid − their own share), and each non-paying participant is
- * debited their share.
+ * debited their share. Completed settlements are then applied on top: paying
+ * someone moves the payer toward zero and reduces what the recipient is owed.
  *
  * The sum of all balances is always 0.
  *
@@ -213,8 +216,14 @@ export function netForUser(expenses: Expense[], userId: string): number {
  * // $90 dinner, Alice paid, split evenly with Bob & Charlie
  * calculateBalances({ expenses, memberIds: ['alice', 'bob', 'charlie'] })
  * // → { alice: 60, bob: -30, charlie: -30 }
+ * // …then Bob marks his $30 as paid
+ * // → { alice: 30, bob: 0, charlie: -30 }
  */
-export function calculateBalances({ expenses, memberIds }: GroupSnapshot): BalanceMap {
+export function calculateBalances({
+  expenses,
+  memberIds,
+  settlements = [],
+}: GroupSnapshot): BalanceMap {
   const balances: BalanceMap = {};
   for (const id of memberIds) balances[id] = 0;
 
@@ -235,13 +244,23 @@ export function calculateBalances({ expenses, memberIds }: GroupSnapshot): Balan
     }
   }
 
+  for (const settlement of settlements) {
+    balances[settlement.fromUserId] = round(
+      (balances[settlement.fromUserId] ?? 0) + settlement.amount,
+    );
+    balances[settlement.toUserId] = round(
+      (balances[settlement.toUserId] ?? 0) - settlement.amount,
+    );
+  }
+
   return balances;
 }
 
 // ─── Core: calculateSettlements ───────────────────────────────────────────────
 
 /**
- * Returns the minimum set of transactions required to fully settle a group.
+ * Returns the minimum set of transactions still required to fully settle a group,
+ * i.e. what remains outstanding after any completed settlements.
  *
  * Delegates to `settleBalances` — exposed separately so callers who already have
  * a `BalanceMap` can skip recomputing it.

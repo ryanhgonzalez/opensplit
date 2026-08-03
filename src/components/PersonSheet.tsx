@@ -21,6 +21,7 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
   const users = useStore(s => s.users);
   const groups = useStore(s => s.groups);
   const allExpenses = useStore(s => s.expenses);
+  const allSettlements = useStore(s => s.settlements);
   const friendBalances = useStore(s => s.friendBalances);
   const updateUser = useStore(s => s.updateUser);
   const deleteUser = useStore(s => s.deleteUser);
@@ -42,8 +43,13 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
   const balance = group
     ? (() => {
         const groupExpenses = allExpenses.filter(e => e.groupId === groupId);
+        const groupSettlements = allSettlements.filter(s => s.groupId === groupId);
         const memberIds = group.members.map(m => m.userId);
-        const balances = calculateBalances({ expenses: groupExpenses, memberIds });
+        const balances = calculateBalances({
+          expenses: groupExpenses,
+          memberIds,
+          settlements: groupSettlements,
+        });
         return balances[userId] ?? 0;
       })()
     : (friendBalances[userId] ?? 0);

@@ -5,14 +5,23 @@ import { useStore, selectCurrentUser } from '../store';
 import { calculateBalances, calculateSettlements } from '../lib/calculations';
 import { formatCurrency, formatDate } from '../utils';
 import { CATEGORY_ICONS } from '../types';
-import type { Expense } from '../types';
+import type { Expense, PaymentMethod } from '../types';
 import TopBar from '../components/TopBar';
 import Avatar from '../components/Avatar';
 import GlassCard from '../components/GlassCard';
 import AddExpenseSheet from '../components/AddExpenseSheet';
 import EditGroupSheet from '../components/EditGroupSheet';
 import PersonSheet from '../components/PersonSheet';
+import SettleModal from '../components/SettleModal';
 import './GroupDetail.css';
+
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  venmo: 'Venmo',
+  cashapp: 'Cash App',
+  zelle: 'Zelle',
+  cash: 'Cash',
+  other: 'Other',
+};
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -32,11 +41,16 @@ export default function GroupDetail() {
   const [expenseMenuId, setExpenseMenuId] = useState<string | null>(null);
   const [showEditGroup, setShowEditGroup] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [settling, setSettling] = useState<{ from: string; to: string; amount: number } | null>(null);
+  const [undoPaymentId, setUndoPaymentId] = useState<string | null>(null);
 
   const users = useStore(s => s.users);
   const groups = useStore(s => s.groups);
   const allExpenses = useStore(s => s.expenses);
+  const allSettlements = useStore(s => s.settlements);
   const deleteExpense = useStore(s => s.deleteExpense);
+  const addSettlement = useStore(s => s.addSettlement);
+  const deleteSettlement = useStore(s => s.deleteSettlement);
   const currentUser = useStore(selectCurrentUser)!;
 
   const group = useMemo(() => groups.find(g => g.id === id), [groups, id]);
@@ -44,9 +58,17 @@ export default function GroupDetail() {
     () => allExpenses.filter(e => e.groupId === id),
     [allExpenses, id],
   );
+  const groupSettlements = useMemo(
+    () => allSettlements.filter(s => s.groupId === id),
+    [allSettlements, id],
+  );
   const sortedExpenses = useMemo(
     () => [...expenses].sort((a, b) => b.date.getTime() - a.date.getTime()),
     [expenses],
+  );
+  const sortedPayments = useMemo(
+    () => [...groupSettlements].sort((a, b) => b.date.getTime() - a.date.getTime()),
+    [groupSettlements],
   );
 
   const getUserById = (uid: string) => users.find(u => u.id === uid);
@@ -71,8 +93,10 @@ export default function GroupDetail() {
   if (!group) return null;
 
   const memberIds = group.members.map(m => m.userId);
-  const balances = calculateBalances({ expenses, memberIds });
-  const settlements = calculateSettlements({ expenses, memberIds });
+  // Completed payments count against the expense totals, so balances and the
+  // suggested transfers below both reflect what is actually still outstanding.
+  const balances = calculateBalances({ expenses, memberIds, settlements: groupSettlements });
+  const settlements = calculateSettlements({ expenses, memberIds, settlements: groupSettlements });
   const myBalance = balances[currentUser.id] ?? 0;
   const hasExpenses = expenses.length > 0;
 
@@ -85,6 +109,24 @@ export default function GroupDetail() {
   const handleDeleteExpense = (expenseId: string) => {
     deleteExpense(expenseId);
     setExpenseMenuId(null);
+  };
+
+  const handleSettle = (amount: number, method: PaymentMethod) => {
+    if (!settling) return;
+    addSettlement({
+      fromUserId: settling.from,
+      toUserId: settling.to,
+      amount,
+      currency: 'USD',
+      groupId: id,
+      date: new Date(),
+      paymentMethod: method,
+    });
+  };
+
+  const handleUndoPayment = (settlementId: string) => {
+    deleteSettlement(settlementId);
+    setUndoPaymentId(null);
   };
 
   const rightButtons = (
@@ -199,7 +241,7 @@ export default function GroupDetail() {
             </div>
           </motion.div>
 
-          {/* Settlements */}
+          {/* Outstanding transfers */}
           {settlements.length > 0 && (
             <motion.div variants={itemVariants} className="mb-5 gd-section-settlements">
               <div className="section-header"><h3>Settle Up</h3></div>
@@ -229,6 +271,72 @@ export default function GroupDetail() {
                         {formatCurrency(s.amount)}
                       </span>
                       <Avatar user={to} size="md" />
+                      <motion.button
+                        className="gd-settle-btn"
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSettling({ from: s.from, to: s.to, amount: s.amount })}
+                      >
+                        {isMyDebt ? 'Pay' : isMyCredit ? 'Mark Paid' : 'Settle'}
+                      </motion.button>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Completed payments */}
+          {sortedPayments.length > 0 && (
+            <motion.div variants={itemVariants} className="mb-5 gd-section-payments">
+              <div className="section-header">
+                <h3>{sortedPayments.length} Payment{sortedPayments.length !== 1 ? 's' : ''}</h3>
+              </div>
+              <div className="px-5">
+                {sortedPayments.map(p => {
+                  const from = getUserById(p.fromUserId);
+                  const to = getUserById(p.toUserId);
+                  if (!from || !to) return null;
+                  const confirming = undoPaymentId === p.id;
+                  return (
+                    <div key={p.id} className="gd-payment-row glass" style={{ marginBottom: 8 }}>
+                      <div className="gd-payment-check">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                          <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      <div className="gd-payment-info">
+                        <span className="gd-payment-title">
+                          {p.fromUserId === currentUser.id ? 'You' : from.name.split(' ')[0]}
+                          {' paid '}
+                          {p.toUserId === currentUser.id ? 'you' : to.name.split(' ')[0]}
+                        </span>
+                        <span className="text-xs text-secondary">
+                          {formatDate(p.date)}
+                          {p.paymentMethod ? ` · ${PAYMENT_METHOD_LABELS[p.paymentMethod]}` : ''}
+                        </span>
+                      </div>
+                      <span className="text-green gd-payment-amount">{formatCurrency(p.amount)}</span>
+                      {confirming ? (
+                        <div className="gd-payment-confirm">
+                          <button className="gd-payment-cancel" onClick={() => setUndoPaymentId(null)}>
+                            Keep
+                          </button>
+                          <button className="gd-payment-undo-confirm" onClick={() => handleUndoPayment(p.id)}>
+                            Undo
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="gd-payment-undo"
+                          onClick={() => setUndoPaymentId(p.id)}
+                          aria-label="Undo this payment"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path d="M3 10H16C18.7614 10 21 12.2386 21 15C21 17.7614 18.7614 20 16 20H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M7 6L3 10L7 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -390,6 +498,21 @@ export default function GroupDetail() {
             onClose={() => setSelectedMemberId(null)}
             userId={selectedMemberId}
             groupId={id!}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Mark a payment complete */}
+      <AnimatePresence>
+        {settling && (
+          <SettleModal
+            fromUserId={settling.from}
+            toUserId={settling.to}
+            amount={settling.amount}
+            mode="settle"
+            groupLabel={`${group.emoji} ${group.name}`}
+            onClose={() => setSettling(null)}
+            onConfirm={handleSettle}
           />
         )}
       </AnimatePresence>
