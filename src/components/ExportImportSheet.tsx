@@ -25,6 +25,9 @@ const panelVariants = {
   exit:    { y: '100%', opacity: 0, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] as [number, number, number, number] } },
 };
 
+/** Sentinel for "I am none of the people in this file". */
+const NOT_IN_FILE = '__not-in-file__';
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatusBanner({ type, children }: { type: 'success' | 'warning' | 'error'; children: React.ReactNode }) {
@@ -125,6 +128,8 @@ export default function ExportImportSheet({
   const [parseResult,    setParseResult]    = useState<ParseResult | null>(null);
   const [importMode,     setImportMode]     = useState<ImportMode>('merge');
   const [replaceAck,     setReplaceAck]     = useState(false);
+  /** Which person in the file the importer is. '' = not answered yet, NOT_IN_FILE = none of them. */
+  const [selfIdInFile,   setSelfIdInFile]   = useState('');
   const [importStatus,   setImportStatus]   = useState<'idle' | 'done' | 'error'>('idle');
   const [importStats,    setImportStats]    = useState<ImportStats | null>(null);
   const [importError,    setImportError]    = useState<string | null>(null);
@@ -158,6 +163,7 @@ export default function ExportImportSheet({
       setImportStatus('idle');
       setImportStats(null);
       setReplaceAck(false);
+      setSelfIdInFile('');
       if (result.ok && result.data) {
         setImportMode(result.data.exportType === 'group' ? 'new-group' : 'merge');
       }
@@ -195,9 +201,15 @@ export default function ExportImportSheet({
         const stats = mergeImportData(exported.data);
         setImportStats(stats);
       } else {
-        // new-group: remap IDs then merge
-        const payload = remapForNewGroup(exported, users, currentUserId);
-        const stats   = mergeImportData(payload);
+        // new-group: fold whoever the importer said they are into their own
+        // account, remap the rest to fresh IDs, then merge.
+        const payload = remapForNewGroup(
+          exported,
+          users,
+          currentUserId,
+          selfIdInFile === NOT_IN_FILE ? null : selfIdInFile,
+        );
+        const stats = mergeImportData(payload);
         setImportStats(stats);
       }
       setImportStatus('done');
@@ -213,12 +225,14 @@ export default function ExportImportSheet({
     setImportStats(null);
     setImportError(null);
     setReplaceAck(false);
+    setSelfIdInFile('');
   }
 
   // ── Derived ──────────────────────────────────────────────────────────────────
 
   const canImport = parseResult?.ok &&
     (importMode !== 'replace' || replaceAck) &&
+    (importMode !== 'new-group' || selfIdInFile !== '') &&
     importStatus === 'idle';
 
   const exportedData = parseResult?.ok ? parseResult.data! : null;
@@ -482,6 +496,36 @@ export default function ExportImportSheet({
                                 title="Import as new group"
                                 description="Creates fresh copies with new IDs. Safe to use — nothing existing is changed."
                               />
+                            )}
+
+                            {/* The file was written from its author's point of view. Without
+                                this the importer silently inherits the author's identity. */}
+                            {importMode === 'new-group' && (
+                              <div className="field-group" style={{ margin: '4px 0 12px' }}>
+                                <label className="field-label" htmlFor="eis-self">
+                                  Which of these people are you?
+                                </label>
+                                <select
+                                  id="eis-self"
+                                  className="field-input eis-select"
+                                  value={selfIdInFile}
+                                  onChange={(e) => setSelfIdInFile(e.target.value)}
+                                >
+                                  <option value="" disabled>Select yourself…</option>
+                                  {exportedData.data.users.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                      {u.name}
+                                      {u.id === exportedData.data.currentUserId ? ' — shared this file' : ''}
+                                    </option>
+                                  ))}
+                                  <option value={NOT_IN_FILE}>None of them — I&apos;m not in this group</option>
+                                </select>
+                                <p className="eis-hint">
+                                  {selfIdInFile === NOT_IN_FILE
+                                    ? 'Everyone in the file is added as a separate person, and none of their expenses count as yours.'
+                                    : 'What this person paid and owes becomes yours — balances are shown from their side.'}
+                                </p>
+                              </div>
                             )}
 
                             <ImportModeCard

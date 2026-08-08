@@ -14,7 +14,7 @@ import type {
 } from '../types';
 import type { ExportPayload, ImportStats } from '../lib/dataExport';
 import { round } from '../lib/calculations';
-import { getShareForUser } from '../utils/expense';
+import { getShareForUser, getNetAmountForUser } from '../utils/expense';
 
 // ─── Action input types ───────────────────────────────────────────────────────
 
@@ -35,6 +35,13 @@ export interface AppStore {
   hasOnboarded: boolean;
   theme: ThemeMode;
   currentUserId: string;
+  /**
+   * True when the data on hand came from somebody else's export and the person
+   * using the app has not yet said which of the imported people they are.
+   * While set, the app shows the identity picker instead of the main shell —
+   * otherwise the importer would silently be acting as the exporter.
+   */
+  needsIdentity: boolean;
   users: User[];
   groups: Group[];
   expenses: Expense[];
@@ -55,7 +62,10 @@ export interface AppStore {
   completeOnboarding: (name: string) => void;
 
   // ── User actions ──
+  /** Switches whose perspective the whole app is rendered from. */
   setCurrentUser: (userId: string) => void;
+  /** Adds a person and immediately becomes them — used when the importer isn't in the file. */
+  claimIdentityAsNewUser: (name: string) => User;
 
   // ── Expense actions ──
   addExpense: (input: AddExpenseInput) => Expense;
@@ -105,10 +115,15 @@ function makeUser(name: string, index: number): User {
   };
 }
 
+/**
+ * A user's net position on one expense: positive means they are owed money.
+ * Having no share does NOT mean no effect — paying $500 that is split entirely
+ * between two other people leaves you $500 up, so this must not short-circuit
+ * on a zero share. (friendBalances always got this right, which is why group
+ * balances could drift below the sum of the per-friend balances.)
+ */
 function expenseNetForUser(expense: Expense, userId: string): number {
-  const share = getShareForUser(expense, userId);
-  if (share === 0) return 0;
-  return expense.paidBy === userId ? expense.amount - share : -share;
+  return getNetAmountForUser(expense, userId);
 }
 
 function applyExpenseToFriendBalances(
@@ -192,6 +207,7 @@ export const useStore = create<AppStore>()(
         hasOnboarded: false,
         theme: 'system' as ThemeMode,
         currentUserId: '',
+        needsIdentity: false,
         users: [],
         groups: [],
         expenses: [],
@@ -207,13 +223,65 @@ export const useStore = create<AppStore>()(
 
         completeOnboarding: (name) => {
           const user = makeUser(name, 0);
-          set({ hasOnboarded: true, currentUserId: user.id, users: [user] }, false, 'completeOnboarding');
+          set(
+            { hasOnboarded: true, needsIdentity: false, currentUserId: user.id, users: [user] },
+            false,
+            'completeOnboarding',
+          );
         },
 
         // ── User ─────────────────────────────────────────────────────────────
 
-        setCurrentUser: (userId) =>
-          set({ currentUserId: userId }, false, 'setCurrentUser'),
+        /**
+         * Every balance in the app is stored from the current user's point of
+         * view, so adopting a different identity means rebuilding friendBalances
+         * and each group's yourBalance from the raw expenses / settlements.
+         */
+        setCurrentUser: (userId) => {
+          const { users, expenses, settlements, groups } = get();
+          if (!users.some((u) => u.id === userId)) return;
+
+          const { friendBalances, groups: recalcedGroups } = recalcAll(
+            expenses,
+            settlements,
+            groups,
+            userId,
+          );
+
+          set(
+            { currentUserId: userId, needsIdentity: false, groups: recalcedGroups, friendBalances },
+            false,
+            'setCurrentUser',
+          );
+        },
+
+        claimIdentityAsNewUser: (name) => {
+          const { users, expenses, settlements, groups } = get();
+          const user = makeUser(name, users.length);
+
+          // A brand-new person appears in no expense, so every balance is zero —
+          // recalc anyway so group totals reflect the new perspective.
+          const { friendBalances, groups: recalcedGroups } = recalcAll(
+            expenses,
+            settlements,
+            groups,
+            user.id,
+          );
+
+          set(
+            {
+              users: [...users, user],
+              currentUserId: user.id,
+              needsIdentity: false,
+              groups: recalcedGroups,
+              friendBalances,
+            },
+            false,
+            'claimIdentityAsNewUser',
+          );
+
+          return user;
+        },
 
         // ── Expenses ─────────────────────────────────────────────────────────
 
@@ -551,7 +619,21 @@ export const useStore = create<AppStore>()(
           const { currentUserId, users, groups, expenses, settlements, activities } = payload;
           const { friendBalances, groups: updatedGroups } = recalcAll(expenses, settlements, groups, currentUserId);
           set(
-            { hasOnboarded: true, currentUserId, users, groups: updatedGroups, expenses, settlements, activities, friendBalances },
+            {
+              hasOnboarded: true,
+              // The file carries its author's identity. If more than one person
+              // is in it we can't know whether this is the author restoring a
+              // backup or someone they shared it with, so ask before letting
+              // the app render from the author's perspective.
+              needsIdentity: users.length > 1,
+              currentUserId,
+              users,
+              groups: updatedGroups,
+              expenses,
+              settlements,
+              activities,
+              friendBalances,
+            },
             false,
             'restoreAllData',
           );
@@ -608,6 +690,7 @@ export const useStore = create<AppStore>()(
               hasOnboarded: false,
               theme: 'system' as ThemeMode,
               currentUserId: '',
+              needsIdentity: false,
               users: [],
               groups: [],
               expenses: [],
@@ -622,10 +705,30 @@ export const useStore = create<AppStore>()(
       {
         name: 'opensplit-v2',
         storage: persistStorage,
+        version: 1,
+        /**
+         * v0 stored group balances built by an expenseNetForUser that returned 0
+         * whenever you had no share, so any expense you paid entirely on someone
+         * else's behalf was left out of yourBalance. Rebuild from the raw
+         * expenses and settlements, which were never affected.
+         */
+        migrate: (persisted, fromVersion) => {
+          const state = persisted as Partial<AppStore>;
+          if (fromVersion >= 1 || !state) return state as AppStore;
+
+          const { friendBalances, groups } = recalcAll(
+            state.expenses ?? [],
+            state.settlements ?? [],
+            state.groups ?? [],
+            state.currentUserId ?? '',
+          );
+          return { ...state, friendBalances, groups } as AppStore;
+        },
         partialize: (state) => ({
           hasOnboarded:   state.hasOnboarded,
           theme:          state.theme,
           currentUserId:  state.currentUserId,
+          needsIdentity:  state.needsIdentity,
           users:          state.users,
           groups:         state.groups,
           expenses:       state.expenses,

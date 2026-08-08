@@ -184,10 +184,11 @@ export default function Onboarding() {
               <div className="ob-divider"><span>or</span></div>
 
               <button className="ob-secondary" onClick={() => fileRef.current?.click()}>
-                Restore from a backup file
+                Open a shared or backed-up file
               </button>
               <p className="ob-secondary-hint">
-                Cleared your data or switching devices? Import a previously exported OpenSplit&nbsp;.json.
+                Switching devices, or has someone shared their expenses with you? Import their
+                OpenSplit&nbsp;.json — you&apos;ll pick which person you are next.
               </p>
             </motion.div>
           </motion.div>

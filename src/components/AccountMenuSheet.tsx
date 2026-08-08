@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStore, selectCurrentUser, type ThemeMode } from '../store';
 import Avatar from './Avatar';
 import ExportImportSheet from './ExportImportSheet';
+import IdentityPicker from './IdentityPicker';
 import './AccountMenuSheet.css';
 
 interface Props {
@@ -21,6 +22,7 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
   const wipeAllData = useStore((s) => s.wipeAllData);
 
   const [showDataSheet, setShowDataSheet] = useState(false);
+  const [showIdentityPicker, setShowIdentityPicker] = useState(false);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [showWipeConfirm, setShowWipeConfirm] = useState(false);
@@ -118,6 +120,24 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
 
               {/* Menu items */}
               <div className="ams-menu">
+                {/* Switch person — re-points the whole app at another member's perspective */}
+                <button className="ams-menu-item" onClick={() => setShowIdentityPicker(true)}>
+                  <div className="ams-menu-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8" />
+                      <path d="M22 11l-3-3M22 11l-3 3M22 11h-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <span className="ams-menu-label">
+                    Switch person
+                    <span className="ams-menu-hint"> · You are {currentUser.name}</span>
+                  </span>
+                  <svg className="ams-menu-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+
                 {/* Data & Backups */}
                 <button className="ams-menu-item" onClick={() => setShowDataSheet(true)}>
                   <div className="ams-menu-icon">
@@ -235,6 +255,13 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
               </button>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Identity picker layers on top */}
+      <AnimatePresence>
+        {showIdentityPicker && (
+          <IdentityPicker variant="switch" onClose={() => setShowIdentityPicker(false)} />
         )}
       </AnimatePresence>
 

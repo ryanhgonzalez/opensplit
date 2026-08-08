@@ -108,7 +108,7 @@ export default function ActivityPage() {
                   getExpenseById,
                   getUserById
                 );
-                const isPositive = isActivityPositive(activity, currentUser.id);
+                const isPositive = isActivityPositive(activity, currentUser.id, getExpenseById);
                 const amount = getActivityAmount(activity, currentUser.id, getExpenseById);
                 const isPayment = activity.type === 'payment' || activity.type === 'settled';
 

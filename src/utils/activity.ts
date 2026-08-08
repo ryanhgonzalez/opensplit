@@ -1,5 +1,5 @@
 import { Activity, Expense, User } from '../types';
-import { getShareForUser } from './expense';
+import { getNetAmountForUser } from './expense';
 import { formatCurrency } from './format';
 
 type GetExpense = (id: string) => Expense | undefined;
@@ -50,11 +50,19 @@ export function getActivityDescription(
   }
 }
 
-export function isActivityPositive(activity: Activity, currentUserId: string): boolean {
+export function isActivityPositive(
+  activity: Activity,
+  currentUserId: string,
+  getExpense: GetExpense,
+): boolean {
   switch (activity.type) {
     case 'expense_added':
-    case 'expense_updated':
-      return activity.actorId === currentUserId;
+    case 'expense_updated': {
+      // Follows the effect on your balance, not who happened to log it —
+      // recording an expense somebody else paid still leaves you owing.
+      const expense = getExpense(activity.expenseId);
+      return !expense || getNetAmountForUser(expense, currentUserId) >= 0;
+    }
     case 'expense_deleted':
       return false;
     case 'payment':
@@ -73,7 +81,10 @@ export function getActivityAmount(
     case 'expense_updated': {
       const expense = getExpense(activity.expenseId);
       if (!expense) return 0;
-      return Math.abs(getShareForUser(expense, currentUserId));
+      // What the expense did to your balance, not what your slice of it was.
+      // Fronting $500 for two other people is +$500 to you even though none of
+      // the split is yours — using the share would show nothing at all.
+      return Math.abs(getNetAmountForUser(expense, currentUserId));
     }
     case 'expense_deleted':
       return 0;

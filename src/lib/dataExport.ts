@@ -239,15 +239,23 @@ export function parseAndValidate(json: string): ParseResult {
 
 // ─── ID remapping — used for "Import as new group" ───────────────────────────
 
+/**
+ * @param selfIdInFile Which person *in the file* the importer is, folded into
+ *   their own account. Defaults to the file's author — correct when you export
+ *   and re-import your own data, but wrong when a friend shares theirs, so the
+ *   import UI lets the importer pick. Pass `null` when they are in neither the
+ *   file nor the group; everyone in the file then comes across as a new person.
+ */
 export function remapForNewGroup(
   exported: AppExport,
   existingUsers: User[],
   appCurrentUserId: string,
+  selfIdInFile: string | null = exported.data.currentUserId,
 ): ExportPayload {
   const idMap = new Map<string, string>();
 
-  // The exported "current user" always maps to the app's current user.
-  idMap.set(exported.data.currentUserId, appCurrentUserId);
+  // Whoever the importer identified as maps to the app's current user.
+  if (selfIdInFile) idMap.set(selfIdInFile, appCurrentUserId);
 
   const byEmail = new Map(existingUsers.filter((u) => u.email).map((u) => [u.email!, u]));
   const byId = new Map(existingUsers.map((u) => [u.id, u]));
@@ -256,7 +264,7 @@ export function remapForNewGroup(
   // Remap users — match existing by email first, then by ID.
   const newUsers: User[] = [];
   for (const u of exported.data.users) {
-    if (u.id === exported.data.currentUserId) continue; // already handled
+    if (u.id === selfIdInFile) continue; // already handled
     const existing = (u.email && byEmail.get(u.email)) || byId.get(u.id);
     if (existing) {
       idMap.set(u.id, existing.id);

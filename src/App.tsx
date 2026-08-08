@@ -12,6 +12,7 @@ import SettleUp from './pages/SettleUp';
 import Insights from './pages/Insights';
 import People from './pages/People';
 import Onboarding from './pages/Onboarding';
+import IdentityPicker from './components/IdentityPicker';
 
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
@@ -48,6 +49,7 @@ function AnimatedRoutes() {
 
 export default function App() {
   const hasOnboarded = useStore((s) => s.hasOnboarded);
+  const needsIdentity = useStore((s) => s.needsIdentity);
   const theme = useStore((s) => s.theme);
 
   // Apply theme to <html data-theme="..."> and keep it in sync
@@ -79,6 +81,20 @@ export default function App() {
           <div className="orb-4" />
         </div>
         <Onboarding />
+      </>
+    );
+  }
+
+  // Data was imported from someone else's export — the person using the app has
+  // to say who they are before anything is rendered from a stranger's viewpoint.
+  if (needsIdentity) {
+    return (
+      <>
+        <div className="app-bg" aria-hidden>
+          <div className="orb-3" />
+          <div className="orb-4" />
+        </div>
+        <IdentityPicker variant="gate" />
       </>
     );
   }
