@@ -13,8 +13,9 @@ export interface Group {
   color: string;
   type: GroupType;
   members: GroupMember[];
-  yourBalance: number;
-  totalSpent: number;
   lastActivity: Date;
   createdAt: Date;
 }
+// `yourBalance` and `totalSpent` used to live here. They are derived from the
+// expenses and settlements now — see `deriveTotals` and the store's balance
+// selectors — because a stored copy could disagree with the records it came from.
