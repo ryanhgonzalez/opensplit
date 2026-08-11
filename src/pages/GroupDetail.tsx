@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useStore, selectCurrentUser } from '../store';
+import { useStore, selectCurrentUser, selectTotalsForGroup } from '../store';
 import { calculateBalances, calculateSettlements } from '../lib/calculations';
 import { formatCurrency, formatDate } from '../utils';
 import { CATEGORY_ICONS } from '../types';
@@ -52,6 +52,7 @@ export default function GroupDetail() {
   const addSettlement = useStore(s => s.addSettlement);
   const deleteSettlement = useStore(s => s.deleteSettlement);
   const currentUser = useStore(selectCurrentUser)!;
+  const { totalSpent } = useStore(selectTotalsForGroup(id ?? ''));
 
   const group = useMemo(() => groups.find(g => g.id === id), [groups, id]);
   const expenses = useMemo(
@@ -179,7 +180,7 @@ export default function GroupDetail() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p className="text-xs text-secondary" style={{ marginBottom: 4 }}>Total spent</p>
-                  <p style={{ fontWeight: 700, fontSize: 17 }}>{formatCurrency(group.totalSpent)}</p>
+                  <p style={{ fontWeight: 700, fontSize: 17 }}>{formatCurrency(totalSpent)}</p>
                 </div>
               </div>
 

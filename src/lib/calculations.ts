@@ -187,12 +187,18 @@ export function validateSplit(expense: Expense): boolean {
 /**
  * Net amount for `userId` from a single expense.
  * Positive → others owe this user. Negative → this user owes the payer.
+ *
+ * Having no share is NOT the same as having no effect: paying $500 that is split
+ * entirely between two other people leaves you $500 up. An earlier version
+ * short-circuited on a zero share and so dropped those expenses from group
+ * balances — the drift the v1 persistence migration exists to repair.
  */
 export function netForUserOnExpense(expense: Expense, userId: string): number {
   const share = expense.split.entries.find((e) => e.userId === userId)?.amount ?? 0;
-  if (share === 0) return 0;
   if (expense.paidBy === userId) return round(expense.amount - share);
-  return -share;
+  // Guard the sign of zero: `-0` renders as "-$0.00" and compares unequal to 0
+  // under Object.is, which is a confusing thing to leak into a balance.
+  return share === 0 ? 0 : -share;
 }
 
 /** Net amount for `userId` summed across multiple expenses. */
@@ -312,4 +318,209 @@ export function settleBalances(balances: BalanceMap): SettlementTransaction[] {
   }
 
   return transactions;
+}
+
+// ─── Core: deriveTotals ───────────────────────────────────────────────────────
+
+/** Per-group running totals from the current user's perspective. */
+export interface GroupTotals {
+  yourBalance: number;
+  totalSpent: number;
+}
+
+export interface DerivedTotals {
+  /**
+   * userId → net balance with the current user.
+   * Positive → they owe the current user. Negative → the current user owes them.
+   */
+  friendBalances: BalanceMap;
+  /** groupId → that group's totals. Groups with no expenses are absent. */
+  groupTotals: Record<string, GroupTotals>;
+}
+
+/**
+ * Rebuilds every balance the UI displays from the raw records.
+ *
+ * This is the single source of truth for `friendBalances`, `yourBalance` and
+ * `totalSpent`. Those used to be stored on the state and patched incrementally
+ * by each action, which meant any action that forgot a term — or reversed one
+ * incorrectly — left the numbers permanently wrong with no way to notice.
+ * Deriving them on read costs a pass over the expense list and cannot drift.
+ */
+export function deriveTotals(
+  expenses: Expense[],
+  settlements: Settlement[],
+  currentUserId: string,
+): DerivedTotals {
+  const friendBalances: BalanceMap = {};
+  const groupTotals: Record<string, GroupTotals> = {};
+
+  const bump = (userId: string, delta: number) => {
+    friendBalances[userId] = (friendBalances[userId] ?? 0) + delta;
+  };
+
+  const totalsFor = (groupId?: string): GroupTotals | undefined => {
+    if (!groupId) return undefined;
+    let totals = groupTotals[groupId];
+    if (!totals) {
+      totals = { yourBalance: 0, totalSpent: 0 };
+      groupTotals[groupId] = totals;
+    }
+    return totals;
+  };
+
+  for (const expense of expenses) {
+    const myShare = expense.split.entries.find((e) => e.userId === currentUserId)?.amount ?? 0;
+
+    if (expense.paidBy === currentUserId) {
+      // I fronted it, so every other participant owes me their share.
+      for (const entry of expense.split.entries) {
+        if (entry.userId !== currentUserId) bump(entry.userId, entry.amount);
+      }
+    } else if (myShare > 0) {
+      // Somebody else fronted it and I was in the split, so I owe them.
+      bump(expense.paidBy, -myShare);
+    }
+
+    const totals = totalsFor(expense.groupId);
+    if (totals) {
+      totals.yourBalance += netForUserOnExpense(expense, currentUserId);
+      totals.totalSpent += expense.amount;
+    }
+  }
+
+  for (const settlement of settlements) {
+    const totals = totalsFor(settlement.groupId);
+
+    if (settlement.fromUserId === currentUserId) {
+      bump(settlement.toUserId, settlement.amount);
+      if (totals) totals.yourBalance += settlement.amount;
+    } else if (settlement.toUserId === currentUserId) {
+      bump(settlement.fromUserId, -settlement.amount);
+      if (totals) totals.yourBalance -= settlement.amount;
+    }
+  }
+
+  for (const userId of Object.keys(friendBalances)) {
+    friendBalances[userId] = round(friendBalances[userId]);
+  }
+  for (const groupId of Object.keys(groupTotals)) {
+    groupTotals[groupId].yourBalance = round(groupTotals[groupId].yourBalance);
+    groupTotals[groupId].totalSpent = round(groupTotals[groupId].totalSpent);
+  }
+
+  return { friendBalances, groupTotals };
+}
+
+// ─── Payment allocation ───────────────────────────────────────────────────────
+
+/** One group's slice of a debt, or the ungrouped remainder when `groupId` is undefined. */
+export interface OutstandingBucket {
+  groupId?: string;
+  outstanding: number;
+}
+
+/** A payment, split into the per-group settlements it should be recorded as. */
+export interface PaymentAllocation {
+  groupId?: string;
+  amount: number;
+}
+
+/**
+ * How much `debtorId` owes `creditorId`, broken down by the group each part of
+ * the debt sits in. Only buckets where the debt runs in that direction are
+ * returned — a group where the money flows the other way cannot be paid down by
+ * this transfer. Expenses with no group collapse into a single `undefined` bucket.
+ *
+ * Sorted largest first so allocation is deterministic.
+ */
+export function outstandingByGroup(
+  expenses: Expense[],
+  settlements: Settlement[],
+  debtorId: string,
+  creditorId: string,
+): OutstandingBucket[] {
+  const UNGROUPED = ' ungrouped';
+  const owed: Record<string, number> = {};
+  const bump = (groupId: string | undefined, delta: number) => {
+    const key = groupId ?? UNGROUPED;
+    owed[key] = (owed[key] ?? 0) + delta;
+  };
+
+  for (const expense of expenses) {
+    const shareOf = (userId: string) =>
+      expense.split.entries.find((e) => e.userId === userId)?.amount ?? 0;
+
+    if (expense.paidBy === creditorId) bump(expense.groupId, shareOf(debtorId));
+    else if (expense.paidBy === debtorId) bump(expense.groupId, -shareOf(creditorId));
+  }
+
+  for (const settlement of settlements) {
+    if (settlement.fromUserId === debtorId && settlement.toUserId === creditorId) {
+      bump(settlement.groupId, -settlement.amount);
+    } else if (settlement.fromUserId === creditorId && settlement.toUserId === debtorId) {
+      bump(settlement.groupId, settlement.amount);
+    }
+  }
+
+  return Object.entries(owed)
+    .filter(([, outstanding]) => outstanding > EPSILON)
+    .map(([key, outstanding]) => ({
+      groupId: key === UNGROUPED ? undefined : key,
+      outstanding: round(outstanding),
+    }))
+    .sort((a, b) => b.outstanding - a.outstanding || (a.groupId ?? '').localeCompare(b.groupId ?? ''));
+}
+
+/**
+ * Divides a payment across the groups the debt actually lives in, proportional
+ * to what is outstanding in each.
+ *
+ * A payment recorded against no group at all moves the overall balance while
+ * leaving every group balance untouched, so the two drift apart permanently and
+ * can never be reconciled. Splitting it keeps the invariant that the group
+ * balances sum to the overall net.
+ *
+ * Anything paid beyond the outstanding total (an overpayment, or a payment made
+ * when nothing is owed) lands in a single ungrouped allocation — it is real
+ * money that has to register somewhere, but it belongs to no group's ledger.
+ *
+ * @example
+ * // Owe Alice $75 on a trip and $25 on rent; pay her $40.
+ * allocatePayment(40, [{ groupId: 'trip', outstanding: 75 }, { groupId: 'rent', outstanding: 25 }])
+ * // → [{ groupId: 'trip', amount: 30 }, { groupId: 'rent', amount: 10 }]
+ */
+export function allocatePayment(amount: number, buckets: OutstandingBucket[]): PaymentAllocation[] {
+  const payment = round(amount);
+  if (payment <= EPSILON) return [];
+
+  const total = round(buckets.reduce((s, b) => s + b.outstanding, 0));
+  const payable = Math.min(payment, total);
+  const allocations: PaymentAllocation[] = [];
+
+  if (payable > EPSILON) {
+    // Floor every share to whole cents, then hand the leftover cents out in
+    // largest-remainder order so the slices sum to exactly `payable`.
+    const shares = buckets.map((b) => {
+      const exact = (payable * b.outstanding) / total;
+      const floored = Math.floor(exact * 100) / 100;
+      return { groupId: b.groupId, amount: floored, remainder: exact - floored };
+    });
+
+    let leftoverCents = Math.round((payable - shares.reduce((s, r) => s + r.amount, 0)) * 100);
+    const byRemainder = [...shares].sort((a, b) => b.remainder - a.remainder);
+    for (let i = 0; leftoverCents > 0; i = (i + 1) % byRemainder.length) {
+      byRemainder[i].amount = round(byRemainder[i].amount + 0.01);
+      leftoverCents--;
+    }
+
+    for (const share of shares) {
+      if (share.amount > 0) allocations.push({ groupId: share.groupId, amount: share.amount });
+    }
+  }
+
+  const excess = round(payment - payable);
+  if (excess > EPSILON) allocations.push({ groupId: undefined, amount: excess });
+
+  return allocations;
 }

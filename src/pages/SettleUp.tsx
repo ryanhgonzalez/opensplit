@@ -31,21 +31,23 @@ export default function SettleUp() {
   const currentUser = useStore(selectCurrentUser)!;
   const balance = useStore(selectOverallBalance);
   const users = useStore((s) => s.users);
-  const addSettlement = useStore((s) => s.addSettlement);
+  const settleWithUser = useStore((s) => s.settleWithUser);
 
   const getUserById = (id: string) => users.find((u) => u.id === id);
 
   /**
-   * Records the payment against the overall balance with that person.
+   * Records the payment against the running total with that person.
    *
-   * Deliberately carries no `groupId`: this page settles the running total across
-   * everything, so it is not attributable to one group. A group's own balance only
-   * moves when the payment is marked complete from inside that group.
+   * This page settles across everything rather than one group, so the payment is
+   * spread over the groups the debt actually sits in, proportional to what is
+   * outstanding in each. Recording it against no group at all — which is what
+   * this used to do — moved the overall balance while leaving every group
+   * balance untouched, so the two could never be reconciled again.
    */
   const handleConfirm = (amount: number, method: PaymentMethod) => {
     if (!activeModal || activeModal.mode === 'remind') return;
 
-    addSettlement({
+    settleWithUser({
       fromUserId: activeModal.fromUserId,
       toUserId: activeModal.toUserId,
       amount,

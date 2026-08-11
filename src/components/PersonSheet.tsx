@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useStore, selectCurrentUser } from '../store';
+import { useStore, selectCurrentUser, selectFriendBalances } from '../store';
 import Avatar from './Avatar';
 import { formatCurrency } from '../utils';
 import { calculateBalances } from '../lib/calculations';
@@ -22,7 +22,7 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
   const groups = useStore(s => s.groups);
   const allExpenses = useStore(s => s.expenses);
   const allSettlements = useStore(s => s.settlements);
-  const friendBalances = useStore(s => s.friendBalances);
+  const friendBalances = useStore(selectFriendBalances);
   const updateUser = useStore(s => s.updateUser);
   const deleteUser = useStore(s => s.deleteUser);
   const removeGroupMember = useStore(s => s.removeGroupMember);

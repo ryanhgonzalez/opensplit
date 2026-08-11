@@ -1,0 +1,409 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { useStore } from './useStore';
+import { selectFriendBalances, selectGroupTotals, selectOverallBalance } from './selectors';
+import { round } from '../lib/calculations';
+import type { Group, User } from '../types';
+
+// ─── Harness ──────────────────────────────────────────────────────────────────
+
+const state = () => useStore.getState();
+const friendBalances = () => selectFriendBalances(state());
+const groupTotals = () => selectGroupTotals(state());
+const balanceIn = (groupId: string) => groupTotals()[groupId]?.yourBalance ?? 0;
+
+/** Everyone in one group, current user first. */
+function setup(names: string[]): { me: User; others: User[]; group: Group } {
+  useStore.getState().wipeAllData();
+  useStore.getState().completeOnboarding(names[0]);
+  const me = state().users[0];
+  const others = names.slice(1).map((name) => state().addUser({ name }));
+  const group = state().createGroup({
+    name: 'Trip',
+    emoji: '✈️',
+    color: '#7c3aed',
+    type: 'trip',
+    members: [me, ...others].map((u) => ({ userId: u.id, role: 'member' as const, joinedAt: new Date() })),
+  });
+  return { me, others, group };
+}
+
+/** An expense `payer` fronted, split evenly between `participants`. */
+function addEvenExpense(payerId: string, participantIds: string[], amount: number, groupId?: string) {
+  const each = round(amount / participantIds.length);
+  return state().addExpense({
+    description: 'Dinner',
+    amount,
+    currency: 'USD',
+    paidBy: payerId,
+    groupId,
+    date: new Date(),
+    category: 'food',
+    split: { type: 'equal', entries: participantIds.map((userId) => ({ userId, amount: each })) },
+  });
+}
+
+beforeEach(() => {
+  useStore.getState().wipeAllData();
+});
+
+// ─── Balances are derived, not stored ─────────────────────────────────────────
+
+describe('derived balances', () => {
+  it('reflects an expense in both the friend balance and the group', () => {
+    const { me, others, group } = setup(['Me', 'Alice', 'Bob']);
+    const [alice, bob] = others;
+    addEvenExpense(me.id, [me.id, alice.id, bob.id], 90, group.id);
+
+    expect(friendBalances()).toEqual({ [alice.id]: 30, [bob.id]: 30 });
+    expect(groupTotals()[group.id]).toEqual({ yourBalance: 60, totalSpent: 90 });
+  });
+
+  it('rewinds exactly when an expense is deleted', () => {
+    const { me, others, group } = setup(['Me', 'Alice']);
+    const [alice] = others;
+    const expense = addEvenExpense(me.id, [me.id, alice.id], 50, group.id);
+    state().deleteExpense(expense.id);
+
+    expect(friendBalances()[alice.id] ?? 0).toBe(0);
+    expect(balanceIn(group.id)).toBe(0);
+    expect(groupTotals()[group.id]?.totalSpent ?? 0).toBe(0);
+  });
+
+  it('follows an edit that changes the amount and the payer', () => {
+    const { me, others, group } = setup(['Me', 'Alice']);
+    const [alice] = others;
+    const expense = addEvenExpense(me.id, [me.id, alice.id], 50, group.id);
+    expect(friendBalances()[alice.id]).toBe(25);
+
+    state().updateExpense(expense.id, {
+      amount: 80,
+      paidBy: alice.id,
+      split: { type: 'equal', entries: [{ userId: me.id, amount: 40 }, { userId: alice.id, amount: 40 }] },
+    });
+
+    expect(friendBalances()[alice.id]).toBe(-40);
+    expect(balanceIn(group.id)).toBe(-40);
+    expect(groupTotals()[group.id].totalSpent).toBe(80);
+  });
+
+  it('recomputes from the new perspective when the identity changes', () => {
+    const { me, others, group } = setup(['Me', 'Alice']);
+    const [alice] = others;
+    addEvenExpense(me.id, [me.id, alice.id], 50, group.id);
+    expect(balanceIn(group.id)).toBe(25);
+
+    state().setCurrentUser(alice.id);
+    expect(balanceIn(group.id)).toBe(-25);
+    expect(friendBalances()[me.id]).toBe(-25);
+  });
+
+  it('keeps the group balances summing to the overall net', () => {
+    const { me, others } = setup(['Me', 'Alice']);
+    const [alice] = others;
+    const trip = state().groups[0];
+    const home = state().createGroup({
+      name: 'Home', emoji: '🏠', color: '#0ea5e9', type: 'home',
+      members: [me, alice].map((u) => ({ userId: u.id, role: 'member' as const, joinedAt: new Date() })),
+    });
+
+    addEvenExpense(me.id, [me.id, alice.id], 150, trip.id);
+    addEvenExpense(alice.id, [me.id, alice.id], 50, home.id);
+    state().settleWithUser({
+      fromUserId: alice.id, toUserId: me.id, amount: 30, currency: 'USD', date: new Date(),
+    });
+
+    const grouped = round(Object.values(groupTotals()).reduce((s, g) => s + g.yourBalance, 0));
+    expect(grouped).toBe(round(selectOverallBalance(state()).net));
+  });
+});
+
+// ─── deleteUser ───────────────────────────────────────────────────────────────
+
+describe('deleteUser', () => {
+  it('refuses to remove the current user', () => {
+    const { me } = setup(['Me', 'Alice']);
+    state().deleteUser(me.id);
+    expect(state().users.some((u) => u.id === me.id)).toBe(true);
+  });
+
+  // Regression: this rebuilt balances from the surviving expenses alone, which
+  // silently reverted every payment that had been marked complete.
+  it('preserves settlements with everyone else', () => {
+    const { me, others, group } = setup(['Me', 'Alice', 'Bob']);
+    const [alice, bob] = others;
+
+    addEvenExpense(me.id, [me.id, alice.id, bob.id], 90, group.id);
+    state().addSettlement({
+      fromUserId: bob.id, toUserId: me.id, amount: 30, currency: 'USD',
+      groupId: group.id, date: new Date(), paymentMethod: 'venmo',
+    });
+    expect(friendBalances()[bob.id]).toBe(0);
+
+    state().deleteUser(alice.id);
+
+    // The dinner is purged along with Alice, so Bob's $30 payment now stands
+    // alone — I owe him. What must not happen is the payment vanishing.
+    expect(state().settlements).toHaveLength(1);
+    expect(friendBalances()[bob.id]).toBe(-30);
+    expect(balanceIn(group.id)).toBe(-30);
+  });
+
+  it('purges only the expenses that involve them', () => {
+    const { me, others, group } = setup(['Me', 'Alice', 'Bob']);
+    const [alice, bob] = others;
+    addEvenExpense(me.id, [me.id, alice.id], 50, group.id);
+    const withBob = addEvenExpense(me.id, [me.id, bob.id], 20, group.id);
+
+    state().deleteUser(alice.id);
+
+    expect(state().expenses.map((e) => e.id)).toEqual([withBob.id]);
+    expect(friendBalances()[bob.id]).toBe(10);
+  });
+
+  it('leaves no dangling references behind', () => {
+    const { me, others, group } = setup(['Me', 'Alice', 'Bob']);
+    const [alice, bob] = others;
+    addEvenExpense(me.id, [me.id, alice.id, bob.id], 90, group.id);
+    state().addSettlement({
+      fromUserId: alice.id, toUserId: me.id, amount: 30, currency: 'USD',
+      groupId: group.id, date: new Date(), paymentMethod: 'cash',
+    });
+
+    state().deleteUser(alice.id);
+
+    const userIds = new Set(state().users.map((u) => u.id));
+    const expenseIds = new Set(state().expenses.map((e) => e.id));
+
+    expect(state().groups[0].members.some((m) => m.userId === alice.id)).toBe(false);
+    expect(friendBalances()[alice.id]).toBeUndefined();
+    for (const activity of state().activities) {
+      expect(userIds.has(activity.actorId)).toBe(true);
+      if (activity.type === 'payment' || activity.type === 'settled') {
+        expect(userIds.has(activity.fromUserId) && userIds.has(activity.toUserId)).toBe(true);
+      }
+      if (activity.type === 'expense_added' || activity.type === 'expense_updated') {
+        expect(expenseIds.has(activity.expenseId)).toBe(true);
+      }
+    }
+  });
+});
+
+// ─── settleWithUser ───────────────────────────────────────────────────────────
+
+describe('settleWithUser', () => {
+  function twoGroups() {
+    const { me, others } = setup(['Me', 'Alice']);
+    const [alice] = others;
+    const trip = state().groups[0];
+    const home = state().createGroup({
+      name: 'Home', emoji: '🏠', color: '#0ea5e9', type: 'home',
+      members: [me, alice].map((u) => ({ userId: u.id, role: 'member' as const, joinedAt: new Date() })),
+    });
+    // Alice fronted both: I owe 75 on the trip and 25 at home.
+    addEvenExpense(alice.id, [me.id, alice.id], 150, trip.id);
+    addEvenExpense(alice.id, [me.id, alice.id], 50, home.id);
+    return { me, alice, trip, home };
+  }
+
+  it('spreads a payment across groups in proportion to what is owed', () => {
+    const { me, alice, trip, home } = twoGroups();
+    expect(friendBalances()[alice.id]).toBe(-100);
+
+    const created = state().settleWithUser({
+      fromUserId: me.id, toUserId: alice.id, amount: 40, currency: 'USD',
+      date: new Date(), paymentMethod: 'venmo',
+    });
+
+    expect(created).toHaveLength(2);
+    expect(balanceIn(trip.id)).toBe(-45);
+    expect(balanceIn(home.id)).toBe(-15);
+    expect(friendBalances()[alice.id]).toBe(-60);
+  });
+
+  // The defect this action exists to fix: a payment attributed to no group moved
+  // the overall balance while every group balance stayed put.
+  it('keeps group balances and the overall net in agreement', () => {
+    const { me, alice } = twoGroups();
+    state().settleWithUser({
+      fromUserId: me.id, toUserId: alice.id, amount: 40, currency: 'USD', date: new Date(),
+    });
+
+    const grouped = round(Object.values(groupTotals()).reduce((s, g) => s + g.yourBalance, 0));
+    expect(grouped).toBe(friendBalances()[alice.id]);
+  });
+
+  it('clears every group when the whole balance is paid', () => {
+    const { me, alice, trip, home } = twoGroups();
+    state().settleWithUser({
+      fromUserId: me.id, toUserId: alice.id, amount: 100, currency: 'USD', date: new Date(),
+    });
+
+    expect(friendBalances()[alice.id]).toBe(0);
+    expect(balanceIn(trip.id)).toBe(0);
+    expect(balanceIn(home.id)).toBe(0);
+  });
+
+  it('works when the money is coming to you', () => {
+    const { me, others, group } = setup(['Me', 'Alice']);
+    const [alice] = others;
+    addEvenExpense(me.id, [me.id, alice.id], 100, group.id);
+    expect(friendBalances()[alice.id]).toBe(50);
+
+    state().settleWithUser({
+      fromUserId: alice.id, toUserId: me.id, amount: 50, currency: 'USD', date: new Date(),
+    });
+
+    expect(friendBalances()[alice.id]).toBe(0);
+    expect(balanceIn(group.id)).toBe(0);
+  });
+
+  it('says "settled up" exactly once, and only when the balance is cleared', () => {
+    const { me, alice } = twoGroups();
+
+    state().settleWithUser({ fromUserId: me.id, toUserId: alice.id, amount: 40, currency: 'USD', date: new Date() });
+    expect(state().activities.filter((a) => a.type === 'settled')).toHaveLength(0);
+    expect(state().activities.filter((a) => a.type === 'payment')).toHaveLength(2);
+
+    state().settleWithUser({ fromUserId: me.id, toUserId: alice.id, amount: 60, currency: 'USD', date: new Date() });
+    expect(state().activities.filter((a) => a.type === 'settled')).toHaveLength(1);
+  });
+
+  it('records an overpayment without losing the excess', () => {
+    const { me, alice } = twoGroups();
+    const created = state().settleWithUser({
+      fromUserId: me.id, toUserId: alice.id, amount: 130, currency: 'USD', date: new Date(),
+    });
+
+    expect(round(created.reduce((s, c) => s + c.amount, 0))).toBe(130);
+    expect(created.some((c) => c.groupId === undefined)).toBe(true);
+    expect(friendBalances()[alice.id]).toBe(30);
+  });
+
+  it('is undoable one slice at a time', () => {
+    const { me, alice, trip, home } = twoGroups();
+    const created = state().settleWithUser({
+      fromUserId: me.id, toUserId: alice.id, amount: 40, currency: 'USD', date: new Date(),
+    });
+
+    const tripSlice = created.find((s) => s.groupId === trip.id)!;
+    state().deleteSettlement(tripSlice.id);
+
+    expect(balanceIn(trip.id)).toBe(-75);
+    expect(balanceIn(home.id)).toBe(-15);
+    expect(state().activities.some((a) => 'settlementId' in a && a.settlementId === tripSlice.id)).toBe(false);
+  });
+});
+
+// ─── Group deletion ───────────────────────────────────────────────────────────
+
+describe('deleteGroup', () => {
+  it('removes the group’s records and the balances that came from them', () => {
+    const { me, others, group } = setup(['Me', 'Alice']);
+    const [alice] = others;
+    addEvenExpense(me.id, [me.id, alice.id], 90, group.id);
+    state().addSettlement({
+      fromUserId: alice.id, toUserId: me.id, amount: 20, currency: 'USD',
+      groupId: group.id, date: new Date(), paymentMethod: 'cash',
+    });
+
+    state().deleteGroup(group.id);
+
+    expect(state().expenses).toHaveLength(0);
+    expect(state().settlements).toHaveLength(0);
+    expect(state().activities).toHaveLength(0);
+    expect(friendBalances()[alice.id] ?? 0).toBe(0);
+  });
+});
+
+// ─── Persistence migration ────────────────────────────────────────────────────
+
+describe('v1 → v2 migration', () => {
+  const ME = 'user-me';
+  const ALICE = 'user-alice';
+  const TRIP = 'group-trip';
+  const HOME = 'group-home';
+
+  /** A v1 payload: stored balances on the state, and a payment tied to no group. */
+  function seedV1() {
+    const member = (userId: string) => ({ userId, role: 'member', joinedAt: '2026-01-01T00:00:00.000Z' });
+    const evenSplit = (a: number) => ({
+      type: 'equal',
+      entries: [{ userId: ME, amount: a }, { userId: ALICE, amount: a }],
+    });
+
+    localStorage.setItem('opensplit-v2', JSON.stringify({
+      version: 1,
+      state: {
+        hasOnboarded: true,
+        theme: 'system',
+        currentUserId: ME,
+        needsIdentity: false,
+        users: [
+          { id: ME, name: 'Me', initials: 'M', avatarColor: '#7c3aed', createdAt: '2026-01-01T00:00:00.000Z' },
+          { id: ALICE, name: 'Alice', initials: 'A', avatarColor: '#0ea5e9', createdAt: '2026-01-01T00:00:00.000Z' },
+        ],
+        groups: [
+          // Deliberately wrong stored totals — the migration must discard, not trust them.
+          { id: TRIP, name: 'Trip', emoji: '✈️', color: '#7c3aed', type: 'trip', members: [member(ME), member(ALICE)],
+            yourBalance: 999, totalSpent: 999, lastActivity: '2026-01-02T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' },
+          { id: HOME, name: 'Home', emoji: '🏠', color: '#0ea5e9', type: 'home', members: [member(ME), member(ALICE)],
+            yourBalance: -12, totalSpent: -12, lastActivity: '2026-01-02T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' },
+        ],
+        expenses: [
+          { id: 'exp-trip', description: 'Hotel', amount: 150, currency: 'USD', paidBy: ALICE, groupId: TRIP,
+            date: '2026-01-02T00:00:00.000Z', category: 'accommodation', split: evenSplit(75),
+            createdAt: '2026-01-02T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' },
+          { id: 'exp-home', description: 'Internet', amount: 50, currency: 'USD', paidBy: ALICE, groupId: HOME,
+            date: '2026-01-02T00:00:00.000Z', category: 'utilities', split: evenSplit(25),
+            createdAt: '2026-01-02T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' },
+        ],
+        // The bug: recorded from Settle Up, so attributable to no group at all.
+        settlements: [
+          { id: 'set-loose', fromUserId: ME, toUserId: ALICE, amount: 40, currency: 'USD',
+            date: '2026-01-03T00:00:00.000Z', paymentMethod: 'venmo', createdAt: '2026-01-03T00:00:00.000Z' },
+        ],
+        activities: [
+          { id: 'act-1', type: 'payment', actorId: ME, settlementId: 'set-loose', fromUserId: ME, toUserId: ALICE,
+            amount: 40, date: '2026-01-03T00:00:00.000Z' },
+        ],
+        friendBalances: { [ALICE]: -60 },
+      },
+    }));
+  }
+
+  beforeEach(async () => {
+    seedV1();
+    await useStore.persist.rehydrate();
+  });
+
+  it('drops the stored balances in favour of derived ones', () => {
+    expect((state() as unknown as Record<string, unknown>).friendBalances).toBeUndefined();
+    for (const group of state().groups) {
+      expect(group).not.toHaveProperty('yourBalance');
+      expect(group).not.toHaveProperty('totalSpent');
+    }
+    expect(groupTotals()[TRIP]).toEqual({ yourBalance: -45, totalSpent: 150 });
+    expect(groupTotals()[HOME]).toEqual({ yourBalance: -15, totalSpent: 50 });
+  });
+
+  it('re-attributes the groupless payment across the groups it paid down', () => {
+    const byGroup = Object.fromEntries(state().settlements.map((s) => [s.groupId, s.amount]));
+    expect(byGroup).toEqual({ [TRIP]: 30, [HOME]: 10 });
+    expect(round(state().settlements.reduce((s, x) => s + x.amount, 0))).toBe(40);
+  });
+
+  it('leaves the overall balance exactly where it was', () => {
+    expect(friendBalances()[ALICE]).toBe(-60);
+  });
+
+  it('reconciles the group balances with the net, which v1 could not', () => {
+    const grouped = round(Object.values(groupTotals()).reduce((s, g) => s + g.yourBalance, 0));
+    expect(grouped).toBe(friendBalances()[ALICE]);
+  });
+
+  it('keeps the activity entry pointing at a settlement that still exists', () => {
+    const settlementIds = new Set(state().settlements.map((s) => s.id));
+    const activity = state().activities.find((a) => a.id === 'act-1')!;
+    expect('settlementId' in activity && settlementIds.has(activity.settlementId)).toBe(true);
+  });
+});

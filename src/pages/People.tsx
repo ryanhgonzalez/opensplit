@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useStore, selectCurrentUser } from '../store';
+import { useStore, selectCurrentUser, selectFriendBalances } from '../store';
 import Avatar from '../components/Avatar';
 import PersonSheet from '../components/PersonSheet';
 import GlassCard from '../components/GlassCard';
@@ -20,7 +20,7 @@ export default function People() {
   const currentUser = useStore(selectCurrentUser)!;
   const users = useStore(s => s.users);
   const groups = useStore(s => s.groups);
-  const friendBalances = useStore(s => s.friendBalances);
+  const friendBalances = useStore(selectFriendBalances);
   const addUser = useStore(s => s.addUser);
 
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);

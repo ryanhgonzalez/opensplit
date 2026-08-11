@@ -329,7 +329,8 @@ export function remapForNewGroup(
 
   // Remap friendBalance keys.
   const remappedBalances: Record<string, number> = {};
-  for (const [oldId, bal] of Object.entries(exported.data.friendBalances)) {
+  // Not checked by `parseAndValidate`, so a valid file may legitimately omit it.
+  for (const [oldId, bal] of Object.entries(exported.data.friendBalances ?? {})) {
     remappedBalances[remapId(oldId)] = bal;
   }
 

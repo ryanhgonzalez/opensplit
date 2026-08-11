@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import GlassCard from '../components/GlassCard';
 import Avatar from '../components/Avatar';
 import CreateGroupSheet from '../components/CreateGroupSheet';
-import { useStore } from '../store';
+import { useStore, selectGroupTotals } from '../store';
 import { formatCurrency, formatDate } from '../utils';
 import './Groups.css';
 
@@ -24,8 +24,10 @@ export default function Groups() {
   const [showCreate, setShowCreate] = useState(false);
   const groups = useStore((s) => s.groups);
   const users = useStore((s) => s.users);
+  const groupTotals = useStore(selectGroupTotals);
 
   const getUserById = (id: string) => users.find((u) => u.id === id);
+  const totalsOf = (groupId: string) => groupTotals[groupId] ?? { yourBalance: 0, totalSpent: 0 };
 
   const filtered = groups.filter((g) =>
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -90,8 +92,8 @@ export default function Groups() {
                 <span className="text-sm text-secondary">Net balance</span>
                 <span className="text-green" style={{ fontWeight: 700, fontSize: 18 }}>
                   +{formatCurrency(
-                    groups.reduce((sum, g) => sum + (g.yourBalance > 0 ? g.yourBalance : 0), 0) -
-                    groups.reduce((sum, g) => sum + (g.yourBalance < 0 ? Math.abs(g.yourBalance) : 0), 0)
+                    groups.reduce((sum, g) => sum + Math.max(totalsOf(g.id).yourBalance, 0), 0) -
+                    groups.reduce((sum, g) => sum + Math.max(-totalsOf(g.id).yourBalance, 0), 0)
                   )}
                 </span>
               </div>
@@ -108,8 +110,9 @@ export default function Groups() {
             ) : (
               filtered.map(group => {
                 const memberUsers = group.members.map((m) => getUserById(m.userId)).filter(Boolean);
-                const isOwed = group.yourBalance > 0;
-                const isEven = group.yourBalance === 0;
+                const { yourBalance, totalSpent } = totalsOf(group.id);
+                const isOwed = yourBalance > 0;
+                const isEven = yourBalance === 0;
 
                 return (
                   <motion.div key={group.id} variants={itemVariants} className="group-card-item">
@@ -139,7 +142,7 @@ export default function Groups() {
                                 : isOwed ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)',
                             }}>
                               <span className={isEven ? 'text-secondary' : isOwed ? 'text-green' : 'text-red'} style={{ fontWeight: 700, fontSize: 15 }}>
-                                {isEven ? 'settled' : `${isOwed ? '+' : '-'}${formatCurrency(group.yourBalance)}`}
+                                {isEven ? 'settled' : `${isOwed ? '+' : '-'}${formatCurrency(yourBalance)}`}
                               </span>
                             </div>
                           </div>
@@ -163,7 +166,7 @@ export default function Groups() {
                               )}
                             </div>
                             <span className="text-xs text-secondary">
-                              Total: {formatCurrency(group.totalSpent)}
+                              Total: {formatCurrency(totalSpent)}
                             </span>
                           </div>
                         </div>

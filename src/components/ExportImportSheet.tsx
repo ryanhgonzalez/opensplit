@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useStore } from '../store';
+import { useStore, selectFriendBalances } from '../store';
 import {
   buildFullExport,
   buildGroupExport,
@@ -110,7 +110,9 @@ export default function ExportImportSheet({
   const expenses    = useStore((s) => s.expenses);
   const settlements = useStore((s) => s.settlements);
   const activities  = useStore((s) => s.activities);
-  const friendBalances  = useStore((s) => s.friendBalances);
+  // Still written into the export file: the format carries it so older app
+  // versions can read these backups. On import it is ignored and recomputed.
+  const friendBalances  = useStore(selectFriendBalances);
   const currentUserId   = useStore((s) => s.currentUserId);
   const restoreAllData  = useStore((s) => s.restoreAllData);
   const mergeImportData = useStore((s) => s.mergeImportData);

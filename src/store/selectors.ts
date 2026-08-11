@@ -1,5 +1,6 @@
 import type { AppStore } from './useStore';
 import type { Activity, Expense, OverallBalance } from '../types';
+import { deriveTotals, type DerivedTotals, type GroupTotals } from '../lib/calculations';
 
 // ─── Entity lookups ───────────────────────────────────────────────────────────
 
@@ -52,23 +53,60 @@ export const selectRecentExpenses = (limit = 10) => (s: AppStore): Expense[] => 
   return result;
 };
 
-// ─── Computed balance ─────────────────────────────────────────────────────────
+// ─── Derived balances ─────────────────────────────────────────────────────────
 
-// Memoized: returns the same OverallBalance object when friendBalances hasn't changed.
-// Without this, the selector creates new arrays on every call → useSyncExternalStore
-// sees a changed snapshot on every render → infinite re-render loop.
-let _friendBalancesSlice: Record<string, number> | undefined;
+// Balances are computed from the raw records rather than stored, so they cannot
+// disagree with the expenses they came from. Memoized on the exact inputs
+// `deriveTotals` reads: without a stable reference, every call would produce new
+// objects → useSyncExternalStore sees a changed snapshot on every render →
+// infinite re-render loop.
+let _totalsKey: { expenses: Expense[]; settlements: AppStore['settlements']; currentUserId: string } | undefined;
+let _totals: DerivedTotals | undefined;
+
+export const selectDerivedTotals = (s: AppStore): DerivedTotals => {
+  if (
+    _totals &&
+    _totalsKey &&
+    _totalsKey.expenses === s.expenses &&
+    _totalsKey.settlements === s.settlements &&
+    _totalsKey.currentUserId === s.currentUserId
+  ) {
+    return _totals;
+  }
+
+  _totals = deriveTotals(s.expenses, s.settlements, s.currentUserId);
+  _totalsKey = { expenses: s.expenses, settlements: s.settlements, currentUserId: s.currentUserId };
+  return _totals;
+};
+
+/** userId → net balance. Positive = they owe you; negative = you owe them. */
+export const selectFriendBalances = (s: AppStore): Record<string, number> =>
+  selectDerivedTotals(s).friendBalances;
+
+/** groupId → that group's totals. Groups with no expenses are absent. */
+export const selectGroupTotals = (s: AppStore): Record<string, GroupTotals> =>
+  selectDerivedTotals(s).groupTotals;
+
+const NO_TOTALS: GroupTotals = { yourBalance: 0, totalSpent: 0 };
+
+/** Usage: useStore(selectTotalsForGroup('group-1')) */
+export const selectTotalsForGroup = (groupId: string) => (s: AppStore): GroupTotals =>
+  selectDerivedTotals(s).groupTotals[groupId] ?? NO_TOTALS;
+
+// Memoized on the derived totals it reads, so the arrays it builds stay stable.
+let _overallSource: DerivedTotals | undefined;
 let _overallBalance: OverallBalance | undefined;
 
 export const selectOverallBalance = (s: AppStore): OverallBalance => {
-  if (_friendBalancesSlice === s.friendBalances && _overallBalance) return _overallBalance;
+  const totals = selectDerivedTotals(s);
+  if (_overallSource === totals && _overallBalance) return _overallBalance;
 
-  const owedByFriend = Object.entries(s.friendBalances)
+  const owedByFriend = Object.entries(totals.friendBalances)
     .filter(([, amount]) => amount > 0.005)
     .map(([userId, amount]) => ({ userId, amount }))
     .sort((a, b) => b.amount - a.amount);
 
-  const oweToFriend = Object.entries(s.friendBalances)
+  const oweToFriend = Object.entries(totals.friendBalances)
     .filter(([, amount]) => amount < -0.005)
     .map(([userId, amount]) => ({ userId, amount: Math.abs(amount) }))
     .sort((a, b) => b.amount - a.amount);
@@ -76,13 +114,13 @@ export const selectOverallBalance = (s: AppStore): OverallBalance => {
   const totalOwed = owedByFriend.reduce((sum, b) => sum + b.amount, 0);
   const totalOwe = oweToFriend.reduce((sum, b) => sum + b.amount, 0);
 
-  _friendBalancesSlice = s.friendBalances;
+  _overallSource = totals;
   _overallBalance = { net: totalOwed - totalOwe, totalOwed, totalOwe, owedByFriend, oweToFriend };
   return _overallBalance;
 };
 
 export const selectGroupBalance = (groupId: string) => (s: AppStore) =>
-  s.groups.find((g) => g.id === groupId)?.yourBalance ?? 0;
+  selectTotalsForGroup(groupId)(s).yourBalance;
 
 export const selectGroupTotalSpent = (groupId: string) => (s: AppStore) =>
-  s.groups.find((g) => g.id === groupId)?.totalSpent ?? 0;
+  selectTotalsForGroup(groupId)(s).totalSpent;

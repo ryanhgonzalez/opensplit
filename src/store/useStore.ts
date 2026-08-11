@@ -6,6 +6,7 @@ import type {
   Expense,
   Settlement,
   Activity,
+  PaymentMethod,
   ExpenseAddedActivity,
   ExpenseUpdatedActivity,
   ExpenseDeletedActivity,
@@ -13,18 +14,28 @@ import type {
   SettledActivity,
 } from '../types';
 import type { ExportPayload, ImportStats } from '../lib/dataExport';
-import { round } from '../lib/calculations';
-import { getShareForUser, getNetAmountForUser } from '../utils/expense';
+import { round, outstandingByGroup, allocatePayment } from '../lib/calculations';
 
 // ─── Action input types ───────────────────────────────────────────────────────
 
 export type AddExpenseInput = Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateExpenseInput = Partial<Omit<Expense, 'id' | 'createdAt'>>;
-export type CreateGroupInput = Omit<Group, 'id' | 'createdAt' | 'yourBalance' | 'totalSpent' | 'lastActivity'>;
+export type CreateGroupInput = Omit<Group, 'id' | 'createdAt' | 'lastActivity'>;
 export type UpdateGroupInput = Partial<Omit<Group, 'id' | 'createdAt'>>;
 export type AddSettlementInput = Omit<Settlement, 'id' | 'createdAt'>;
 export type AddUserInput = { name: string; email?: string };
 export type UpdateUserInput = Partial<Pick<User, 'name' | 'email' | 'avatarColor' | 'initials'>>;
+
+/** A payment that is not tied to one group — the app decides which groups it pays down. */
+export type SettleWithUserInput = {
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  currency: string;
+  date: Date;
+  paymentMethod?: PaymentMethod;
+  note?: string;
+};
 
 // ─── Store interface ──────────────────────────────────────────────────────────
 
@@ -32,6 +43,12 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface AppStore {
   // ── State ──
+  //
+  // Only raw records live here. Every balance the UI shows — per-friend, per-group,
+  // overall — is derived from these by `deriveTotals` behind memoized selectors.
+  // Storing them alongside was the source of a string of drift bugs: each action
+  // had to patch every total correctly and in both directions, and a single missed
+  // term left the numbers permanently wrong with nothing to detect it.
   hasOnboarded: boolean;
   theme: ThemeMode;
   currentUserId: string;
@@ -47,13 +64,6 @@ export interface AppStore {
   expenses: Expense[];
   settlements: Settlement[];
   activities: Activity[];
-  /**
-   * Running per-friend balance from the current user's perspective.
-   * Positive → that friend owes the current user.
-   * Negative → current user owes that friend.
-   * Kept in sync atomically with every expense / settlement action.
-   */
-  friendBalances: Record<string, number>;
 
   // ── Theme ──
   setTheme: (theme: ThemeMode) => void;
@@ -80,7 +90,13 @@ export interface AppStore {
   removeGroupMember: (groupId: string, userId: string) => void;
 
   // ── Settlement actions ──
+  /** Records a payment against one specific group. */
   addSettlement: (input: AddSettlementInput) => Settlement;
+  /**
+   * Records a payment against the running total with someone, spreading it
+   * across the groups the debt actually sits in.
+   */
+  settleWithUser: (input: SettleWithUserInput) => Settlement[];
   deleteSettlement: (id: string) => void;
 
   // ── User actions ──
@@ -115,76 +131,68 @@ function makeUser(name: string, index: number): User {
   };
 }
 
+/** Sub-cent remainders are treated as fully paid. */
+const EPSILON = 0.005;
+
 /**
- * A user's net position on one expense: positive means they are owed money.
- * Having no share does NOT mean no effect — paying $500 that is split entirely
- * between two other people leaves you $500 up, so this must not short-circuit
- * on a zero share. (friendBalances always got this right, which is why group
- * balances could drift below the sum of the per-friend balances.)
+ * Whether `fromUserId` still owes `toUserId` anything once `settlements` are
+ * applied — scoped to one group when `groupId` is given, otherwise across
+ * everything. Decides whether a payment reads as "paid" or "settled up".
  */
-function expenseNetForUser(expense: Expense, userId: string): number {
-  return getNetAmountForUser(expense, userId);
-}
-
-function applyExpenseToFriendBalances(
-  balances: Record<string, number>,
-  expense: Expense,
-  currentUserId: string,
-  direction: 1 | -1,
-): Record<string, number> {
-  const updated = { ...balances };
-  const myShare = getShareForUser(expense, currentUserId);
-
-  if (expense.paidBy === currentUserId) {
-    for (const entry of expense.split.entries) {
-      if (entry.userId === currentUserId) continue;
-      updated[entry.userId] = (updated[entry.userId] ?? 0) + direction * entry.amount;
-    }
-  } else if (myShare > 0) {
-    updated[expense.paidBy] = (updated[expense.paidBy] ?? 0) - direction * myShare;
-  }
-
-  return updated;
-}
-
-function recalcAll(
+function debtCleared(
   expenses: Expense[],
   settlements: Settlement[],
-  groups: Group[],
-  currentUserId: string,
-): { friendBalances: Record<string, number>; groups: Group[] } {
-  let friendBalances: Record<string, number> = {};
+  fromUserId: string,
+  toUserId: string,
+  groupId?: string,
+): boolean {
+  const buckets = outstandingByGroup(expenses, settlements, fromUserId, toUserId);
+  const inScope = groupId ? buckets.filter((b) => b.groupId === groupId) : buckets;
+  return inScope.reduce((sum, b) => sum + b.outstanding, 0) <= EPSILON;
+}
 
-  for (const e of expenses) {
-    friendBalances = applyExpenseToFriendBalances(friendBalances, e, currentUserId, 1);
+function touchGroups(groups: Group[], groupIds: Set<string>, when: Date): Group[] {
+  return groups.map((g) => (groupIds.has(g.id) ? { ...g, lastActivity: when } : g));
+}
+
+/**
+ * Re-attributes payments that were recorded against no group at all.
+ *
+ * Settle Up used to write these, which moved the overall balance while leaving
+ * every group balance untouched — so the group balances no longer summed to the
+ * net and no amount of settling could bring them back in line. Replayed in date
+ * order so each payment is allocated against what was actually outstanding when
+ * it was made.
+ */
+function attributeLooseSettlements(expenses: Expense[], settlements: Settlement[]): Settlement[] {
+  const attributed = settlements.filter((s) => s.groupId);
+  const loose = settlements
+    .filter((s) => !s.groupId)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  for (const payment of loose) {
+    const buckets = outstandingByGroup(expenses, attributed, payment.fromUserId, payment.toUserId);
+    const allocations = allocatePayment(payment.amount, buckets);
+
+    // Nothing to attribute it to (the debt was never group-based) — keep as-is.
+    if (allocations.length === 0) {
+      attributed.push(payment);
+      continue;
+    }
+
+    // The first slice keeps the original ID so the activity feed entry that
+    // references this payment still resolves.
+    attributed.push(
+      ...allocations.map((allocation, i) => ({
+        ...payment,
+        id: i === 0 ? payment.id : uid(),
+        groupId: allocation.groupId,
+        amount: allocation.amount,
+      })),
+    );
   }
 
-  for (const s of settlements) {
-    if (s.fromUserId === currentUserId) {
-      friendBalances[s.toUserId] = round((friendBalances[s.toUserId] ?? 0) + s.amount);
-    } else if (s.toUserId === currentUserId) {
-      friendBalances[s.fromUserId] = round((friendBalances[s.fromUserId] ?? 0) - s.amount);
-    }
-  }
-
-  const updatedGroups = groups.map((g) => {
-    const gExp = expenses.filter((e) => e.groupId === g.id);
-    const gSet = settlements.filter((s) => s.groupId === g.id);
-
-    let yourBalance = gExp.reduce((acc, e) => acc + expenseNetForUser(e, currentUserId), 0);
-    for (const s of gSet) {
-      if (s.fromUserId === currentUserId) yourBalance += s.amount;
-      else if (s.toUserId === currentUserId) yourBalance -= s.amount;
-    }
-
-    return {
-      ...g,
-      yourBalance: round(yourBalance),
-      totalSpent: round(gExp.reduce((acc, e) => acc + e.amount, 0)),
-    };
-  });
-
-  return { friendBalances, groups: updatedGroups };
+  return attributed;
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
@@ -213,7 +221,6 @@ export const useStore = create<AppStore>()(
         expenses: [],
         settlements: [],
         activities: [],
-        friendBalances: {},
 
         // ── Theme ────────────────────────────────────────────────────────────
 
@@ -232,61 +239,28 @@ export const useStore = create<AppStore>()(
 
         // ── User ─────────────────────────────────────────────────────────────
 
-        /**
-         * Every balance in the app is stored from the current user's point of
-         * view, so adopting a different identity means rebuilding friendBalances
-         * and each group's yourBalance from the raw expenses / settlements.
-         */
         setCurrentUser: (userId) => {
-          const { users, expenses, settlements, groups } = get();
-          if (!users.some((u) => u.id === userId)) return;
-
-          const { friendBalances, groups: recalcedGroups } = recalcAll(
-            expenses,
-            settlements,
-            groups,
-            userId,
-          );
-
-          set(
-            { currentUserId: userId, needsIdentity: false, groups: recalcedGroups, friendBalances },
-            false,
-            'setCurrentUser',
-          );
+          if (!get().users.some((u) => u.id === userId)) return;
+          // Balances are derived from the current user, so switching identity
+          // needs nothing but the ID — every total re-reads on the next render.
+          set({ currentUserId: userId, needsIdentity: false }, false, 'setCurrentUser');
         },
 
         claimIdentityAsNewUser: (name) => {
-          const { users, expenses, settlements, groups } = get();
+          const { users } = get();
           const user = makeUser(name, users.length);
-
-          // A brand-new person appears in no expense, so every balance is zero —
-          // recalc anyway so group totals reflect the new perspective.
-          const { friendBalances, groups: recalcedGroups } = recalcAll(
-            expenses,
-            settlements,
-            groups,
-            user.id,
-          );
-
           set(
-            {
-              users: [...users, user],
-              currentUserId: user.id,
-              needsIdentity: false,
-              groups: recalcedGroups,
-              friendBalances,
-            },
+            { users: [...users, user], currentUserId: user.id, needsIdentity: false },
             false,
             'claimIdentityAsNewUser',
           );
-
           return user;
         },
 
         // ── Expenses ─────────────────────────────────────────────────────────
 
         addExpense: (input) => {
-          const { currentUserId, groups, expenses, activities, friendBalances } = get();
+          const { currentUserId, groups, expenses, activities } = get();
           const id = uid();
           const now = new Date();
           const expense: Expense = { ...input, id, createdAt: now, updatedAt: now };
@@ -300,19 +274,11 @@ export const useStore = create<AppStore>()(
             date: now,
           };
 
-          const netChange = expenseNetForUser(expense, currentUserId);
-          const updatedGroups = groups.map((g) =>
-            g.id !== input.groupId
-              ? g
-              : { ...g, yourBalance: g.yourBalance + netChange, totalSpent: g.totalSpent + input.amount, lastActivity: now },
-          );
-
           set(
             {
               expenses: [...expenses, expense],
               activities: [activity, ...activities],
-              groups: updatedGroups,
-              friendBalances: applyExpenseToFriendBalances(friendBalances, expense, currentUserId, 1),
+              groups: input.groupId ? touchGroups(groups, new Set([input.groupId]), now) : groups,
             },
             false,
             'addExpense',
@@ -322,7 +288,7 @@ export const useStore = create<AppStore>()(
         },
 
         updateExpense: (id, updates) => {
-          const { currentUserId, expenses, groups, activities, friendBalances } = get();
+          const { currentUserId, expenses, groups, activities } = get();
           const old = expenses.find((e) => e.id === id);
           if (!old) return;
 
@@ -338,32 +304,14 @@ export const useStore = create<AppStore>()(
             date: now,
           };
 
-          const groupId = old.groupId ?? updated.groupId;
-          const updatedGroups = groups.map((g) => {
-            if (g.id !== groupId) return g;
-            const oldNet = expenseNetForUser(old, currentUserId);
-            const newNet = expenseNetForUser(updated, currentUserId);
-            return {
-              ...g,
-              yourBalance: g.yourBalance - oldNet + newNet,
-              totalSpent: g.totalSpent - old.amount + updated.amount,
-              lastActivity: now,
-            };
-          });
-
-          const patchedBalances = applyExpenseToFriendBalances(
-            applyExpenseToFriendBalances(friendBalances, old, currentUserId, -1),
-            updated,
-            currentUserId,
-            1,
-          );
+          // An expense can be moved between groups, so both ends need touching.
+          const touched = new Set([old.groupId, updated.groupId].filter(Boolean) as string[]);
 
           set(
             {
               expenses: expenses.map((e) => (e.id === id ? updated : e)),
               activities: [activity, ...activities],
-              groups: updatedGroups,
-              friendBalances: patchedBalances,
+              groups: touchGroups(groups, touched, now),
             },
             false,
             'updateExpense',
@@ -371,7 +319,7 @@ export const useStore = create<AppStore>()(
         },
 
         deleteExpense: (id) => {
-          const { currentUserId, expenses, groups, activities, friendBalances } = get();
+          const { currentUserId, expenses, groups, activities } = get();
           const expense = expenses.find((e) => e.id === id);
           if (!expense) return;
 
@@ -385,19 +333,22 @@ export const useStore = create<AppStore>()(
             date: now,
           };
 
-          const netChange = expenseNetForUser(expense, currentUserId);
-          const updatedGroups = groups.map((g) =>
-            g.id !== expense.groupId
-              ? g
-              : { ...g, yourBalance: g.yourBalance - netChange, totalSpent: g.totalSpent - expense.amount, lastActivity: now },
-          );
-
           set(
             {
               expenses: expenses.filter((e) => e.id !== id),
-              activities: [activity, ...activities],
-              groups: updatedGroups,
-              friendBalances: applyExpenseToFriendBalances(friendBalances, expense, currentUserId, -1),
+              // The add/update entries point at an expense that no longer exists;
+              // the deletion entry it leaves behind is the record of what happened.
+              activities: [
+                activity,
+                ...activities.filter(
+                  (a) =>
+                    !(
+                      (a.type === 'expense_added' || a.type === 'expense_updated') &&
+                      a.expenseId === id
+                    ),
+                ),
+              ],
+              groups: expense.groupId ? touchGroups(groups, new Set([expense.groupId]), now) : groups,
             },
             false,
             'deleteExpense',
@@ -408,7 +359,7 @@ export const useStore = create<AppStore>()(
 
         createGroup: (input) => {
           const now = new Date();
-          const group: Group = { ...input, id: uid(), yourBalance: 0, totalSpent: 0, lastActivity: now, createdAt: now };
+          const group: Group = { ...input, id: uid(), lastActivity: now, createdAt: now };
           set({ groups: [...get().groups, group] }, false, 'createGroup');
           return group;
         },
@@ -421,27 +372,13 @@ export const useStore = create<AppStore>()(
           ),
 
         deleteGroup: (id) => {
-          const { currentUserId, groups, expenses, settlements, activities } = get();
-
-          const remainingGroups = groups.filter((g) => g.id !== id);
-          const remainingExpenses = expenses.filter((e) => e.groupId !== id);
-          const remainingSettlements = settlements.filter((s) => s.groupId !== id);
-          const remainingActivities = activities.filter((a) => a.groupId !== id);
-
-          const { friendBalances, groups: recalcedGroups } = recalcAll(
-            remainingExpenses,
-            remainingSettlements,
-            remainingGroups,
-            currentUserId,
-          );
-
+          const { groups, expenses, settlements, activities } = get();
           set(
             {
-              groups: recalcedGroups,
-              expenses: remainingExpenses,
-              settlements: remainingSettlements,
-              activities: remainingActivities,
-              friendBalances,
+              groups: groups.filter((g) => g.id !== id),
+              expenses: expenses.filter((e) => e.groupId !== id),
+              settlements: settlements.filter((s) => s.groupId !== id),
+              activities: activities.filter((a) => a.groupId !== id),
             },
             false,
             'deleteGroup',
@@ -474,54 +411,38 @@ export const useStore = create<AppStore>()(
         // ── Settlements ──────────────────────────────────────────────────────
 
         addSettlement: (input) => {
-          const { currentUserId, settlements, groups, activities, friendBalances } = get();
-          const id = uid();
+          const { settlements, groups, expenses, activities } = get();
           const now = new Date();
-          const amount = round(input.amount);
-          const settlement: Settlement = { ...input, amount, id, createdAt: now };
+          const settlement: Settlement = { ...input, amount: round(input.amount), id: uid(), createdAt: now };
+          const nextSettlements = [...settlements, settlement];
 
-          const currentBalance = friendBalances[input.fromUserId === currentUserId ? input.toUserId : input.fromUserId] ?? 0;
-          const remainingAfter = Math.abs(currentBalance) - amount;
-          const activityType: 'payment' | 'settled' = remainingAfter <= 0.005 ? 'settled' : 'payment';
+          const cleared = debtCleared(
+            expenses,
+            nextSettlements,
+            settlement.fromUserId,
+            settlement.toUserId,
+            settlement.groupId,
+          );
 
           const activity: PaymentActivity | SettledActivity = {
             id: uid(),
-            type: activityType,
-            actorId: input.fromUserId,
-            settlementId: id,
-            fromUserId: input.fromUserId,
-            toUserId: input.toUserId,
-            amount,
-            groupId: input.groupId,
+            type: cleared ? 'settled' : 'payment',
+            actorId: settlement.fromUserId,
+            settlementId: settlement.id,
+            fromUserId: settlement.fromUserId,
+            toUserId: settlement.toUserId,
+            amount: settlement.amount,
+            groupId: settlement.groupId,
             date: now,
           };
 
-          const balanceDelta =
-            input.toUserId === currentUserId
-              ? -amount
-              : input.fromUserId === currentUserId
-                ? amount
-                : 0;
-
-          const updatedGroups = groups.map((g) =>
-            g.id !== input.groupId
-              ? g
-              : { ...g, yourBalance: round(g.yourBalance + balanceDelta), lastActivity: now },
-          );
-
-          const updatedBalances = { ...friendBalances };
-          if (input.fromUserId === currentUserId) {
-            updatedBalances[input.toUserId] = round((updatedBalances[input.toUserId] ?? 0) + amount);
-          } else if (input.toUserId === currentUserId) {
-            updatedBalances[input.fromUserId] = round((updatedBalances[input.fromUserId] ?? 0) - amount);
-          }
-
           set(
             {
-              settlements: [...settlements, settlement],
+              settlements: nextSettlements,
               activities: [activity, ...activities],
-              groups: updatedGroups,
-              friendBalances: updatedBalances,
+              groups: settlement.groupId
+                ? touchGroups(groups, new Set([settlement.groupId]), now)
+                : groups,
             },
             false,
             'addSettlement',
@@ -530,28 +451,86 @@ export const useStore = create<AppStore>()(
           return settlement;
         },
 
-        /** Undo a payment that was marked complete — balances rewind to before it. */
-        deleteSettlement: (id) => {
-          const { currentUserId, settlements, groups, expenses, activities } = get();
-          if (!settlements.some((s) => s.id === id)) return;
+        /**
+         * Splits one payment across the groups the debt sits in, proportional to
+         * what is outstanding in each, and records a settlement per slice.
+         *
+         * Settle Up works on the running total with a person rather than on one
+         * group, but a payment attributed to no group moves only the overall
+         * balance — leaving the group balances stranded above it forever. Paying
+         * each group down in proportion keeps the two consistent.
+         */
+        settleWithUser: (input) => {
+          const { settlements, groups, expenses, activities } = get();
+          const now = new Date();
 
-          const remaining = settlements.filter((s) => s.id !== id);
-          const { friendBalances, groups: recalcedGroups } = recalcAll(
+          const buckets = outstandingByGroup(expenses, settlements, input.fromUserId, input.toUserId);
+          const allocations = allocatePayment(input.amount, buckets);
+          if (allocations.length === 0) return [];
+
+          const created: Settlement[] = allocations.map((allocation) => ({
+            fromUserId: input.fromUserId,
+            toUserId: input.toUserId,
+            amount: allocation.amount,
+            currency: input.currency,
+            groupId: allocation.groupId,
+            date: input.date,
+            paymentMethod: input.paymentMethod,
+            note: input.note,
+            id: uid(),
+            createdAt: now,
+          }));
+
+          const nextSettlements = [...settlements, ...created];
+          const clearedOverall = debtCleared(
             expenses,
-            remaining,
-            groups,
-            currentUserId,
+            nextSettlements,
+            input.fromUserId,
+            input.toUserId,
           );
+
+          // One feed entry per slice, each tagged with its group so the feed
+          // stays readable. Only the last carries "settled up", so a payment
+          // that clears the balance says so exactly once.
+          const newActivities: Array<PaymentActivity | SettledActivity> = created.map((settlement, i) => ({
+            id: uid(),
+            type: clearedOverall && i === created.length - 1 ? 'settled' : 'payment',
+            actorId: settlement.fromUserId,
+            settlementId: settlement.id,
+            fromUserId: settlement.fromUserId,
+            toUserId: settlement.toUserId,
+            amount: settlement.amount,
+            groupId: settlement.groupId,
+            date: now,
+          }));
+
+          const touched = new Set(created.map((s) => s.groupId).filter(Boolean) as string[]);
 
           set(
             {
-              settlements: remaining,
+              settlements: nextSettlements,
+              activities: [...newActivities.reverse(), ...activities],
+              groups: touchGroups(groups, touched, now),
+            },
+            false,
+            'settleWithUser',
+          );
+
+          return created;
+        },
+
+        /** Undo a payment that was marked complete — balances rewind to before it. */
+        deleteSettlement: (id) => {
+          const { settlements, activities } = get();
+          if (!settlements.some((s) => s.id === id)) return;
+
+          set(
+            {
+              settlements: settlements.filter((s) => s.id !== id),
               // Drop the payment / settled entry this settlement produced.
               activities: activities.filter(
                 (a) => !((a.type === 'payment' || a.type === 'settled') && a.settlementId === id),
               ),
-              groups: recalcedGroups,
-              friendBalances,
             },
             false,
             'deleteSettlement',
@@ -577,36 +556,37 @@ export const useStore = create<AppStore>()(
           const { currentUserId, users, groups, expenses, settlements, activities } = get();
           if (id === currentUserId) return;
 
-          const purgeIds = new Set(
+          const purgedExpenseIds = new Set(
             expenses
               .filter((e) => e.paidBy === id || e.split.entries.some((en) => en.userId === id))
               .map((e) => e.id),
           );
-          const remaining = expenses.filter((e) => !purgeIds.has(e.id));
 
-          const updatedGroups = groups.map((g) => {
-            const gExp = remaining.filter((e) => e.groupId === g.id);
-            return {
-              ...g,
-              members: g.members.filter((m) => m.userId !== id),
-              yourBalance: gExp.reduce((s, e) => s + expenseNetForUser(e, currentUserId), 0),
-              totalSpent: gExp.reduce((s, e) => s + e.amount, 0),
-            };
+          // Drop every activity that points at the removed person or at an expense
+          // that went with them. The feed already skips rows whose actor is gone,
+          // so leaving them behind only inflates the event count with entries that
+          // never render — and payment rows name the other party, who may be gone.
+          const remainingActivities = activities.filter((a) => {
+            if (a.actorId === id) return false;
+            if (a.type === 'payment' || a.type === 'settled') {
+              return a.fromUserId !== id && a.toUserId !== id;
+            }
+            if (a.type === 'expense_added' || a.type === 'expense_updated') {
+              return !purgedExpenseIds.has(a.expenseId);
+            }
+            return true;
           });
-
-          let newBalances: Record<string, number> = {};
-          for (const e of remaining) {
-            newBalances = applyExpenseToFriendBalances(newBalances, e, currentUserId, 1);
-          }
 
           set(
             {
               users: users.filter((u) => u.id !== id),
-              expenses: remaining,
-              groups: updatedGroups,
+              expenses: expenses.filter((e) => !purgedExpenseIds.has(e.id)),
               settlements: settlements.filter((s) => s.fromUserId !== id && s.toUserId !== id),
-              activities: activities.filter((a) => a.actorId !== id),
-              friendBalances: newBalances,
+              groups: groups.map((g) => ({
+                ...g,
+                members: g.members.filter((m) => m.userId !== id),
+              })),
+              activities: remainingActivities,
             },
             false,
             'deleteUser',
@@ -617,7 +597,6 @@ export const useStore = create<AppStore>()(
 
         restoreAllData: (payload) => {
           const { currentUserId, users, groups, expenses, settlements, activities } = payload;
-          const { friendBalances, groups: updatedGroups } = recalcAll(expenses, settlements, groups, currentUserId);
           set(
             {
               hasOnboarded: true,
@@ -628,11 +607,10 @@ export const useStore = create<AppStore>()(
               needsIdentity: users.length > 1,
               currentUserId,
               users,
-              groups: updatedGroups,
+              groups,
               expenses,
               settlements,
               activities,
-              friendBalances,
             },
             false,
             'restoreAllData',
@@ -641,11 +619,11 @@ export const useStore = create<AppStore>()(
 
         mergeImportData: (payload) => {
           const state = get();
-          const existingUserIds    = new Set(state.users.map((u) => u.id));
-          const existingGroupIds   = new Set(state.groups.map((g) => g.id));
-          const existingExpIds     = new Set(state.expenses.map((e) => e.id));
-          const existingSetIds     = new Set(state.settlements.map((s) => s.id));
-          const existingActIds     = new Set(state.activities.map((a) => a.id));
+          const existingUserIds  = new Set(state.users.map((u) => u.id));
+          const existingGroupIds = new Set(state.groups.map((g) => g.id));
+          const existingExpIds   = new Set(state.expenses.map((e) => e.id));
+          const existingSetIds   = new Set(state.settlements.map((s) => s.id));
+          const existingActIds   = new Set(state.activities.map((a) => a.id));
 
           const newUsers       = payload.users.filter((u) => !existingUserIds.has(u.id));
           const newGroups      = payload.groups.filter((g) => !existingGroupIds.has(g.id));
@@ -653,22 +631,13 @@ export const useStore = create<AppStore>()(
           const newSettlements = payload.settlements.filter((s) => !existingSetIds.has(s.id));
           const newActivities  = payload.activities.filter((a) => !existingActIds.has(a.id));
 
-          const allExpenses    = [...state.expenses, ...newExpenses];
-          const allSettlements = [...state.settlements, ...newSettlements];
-          const allGroups      = [...state.groups, ...newGroups];
-
-          const { friendBalances, groups: updatedGroups } = recalcAll(
-            allExpenses, allSettlements, allGroups, state.currentUserId,
-          );
-
           set(
             {
               users:       [...state.users, ...newUsers],
-              groups:      updatedGroups,
-              expenses:    allExpenses,
-              settlements: allSettlements,
+              groups:      [...state.groups, ...newGroups],
+              expenses:    [...state.expenses, ...newExpenses],
+              settlements: [...state.settlements, ...newSettlements],
               activities:  [...state.activities, ...newActivities],
-              friendBalances,
             },
             false,
             'mergeImportData',
@@ -696,7 +665,6 @@ export const useStore = create<AppStore>()(
               expenses: [],
               settlements: [],
               activities: [],
-              friendBalances: {},
             },
             false,
             'wipeAllData',
@@ -705,36 +673,49 @@ export const useStore = create<AppStore>()(
       {
         name: 'opensplit-v2',
         storage: persistStorage,
-        version: 1,
+        version: 2,
         /**
-         * v0 stored group balances built by an expenseNetForUser that returned 0
-         * whenever you had no share, so any expense you paid entirely on someone
-         * else's behalf was left out of yourBalance. Rebuild from the raw
-         * expenses and settlements, which were never affected.
+         * v0/v1 kept `friendBalances` on the state and `yourBalance` / `totalSpent`
+         * on each group, maintained by hand as actions ran. They are derived now,
+         * so the stored copies are dropped — stale numbers that outrank the real
+         * ones are worse than no numbers.
+         *
+         * v1 also let Settle Up record payments against no group, which the group
+         * balances could never account for; those get re-attributed here.
          */
         migrate: (persisted, fromVersion) => {
-          const state = persisted as Partial<AppStore>;
-          if (fromVersion >= 1 || !state) return state as AppStore;
+          const state = persisted as Partial<AppStore> & { friendBalances?: unknown };
+          if (!state) return state as unknown as AppStore;
 
-          const { friendBalances, groups } = recalcAll(
-            state.expenses ?? [],
-            state.settlements ?? [],
-            state.groups ?? [],
-            state.currentUserId ?? '',
-          );
-          return { ...state, friendBalances, groups } as AppStore;
+          if (fromVersion < 2) {
+            delete state.friendBalances;
+
+            type LegacyGroup = Group & { yourBalance?: number; totalSpent?: number };
+            state.groups = ((state.groups ?? []) as LegacyGroup[]).map((group) => {
+              const cleaned: LegacyGroup = { ...group };
+              delete cleaned.yourBalance;
+              delete cleaned.totalSpent;
+              return cleaned as Group;
+            });
+
+            state.settlements = attributeLooseSettlements(
+              state.expenses ?? [],
+              state.settlements ?? [],
+            );
+          }
+
+          return state as AppStore;
         },
         partialize: (state) => ({
-          hasOnboarded:   state.hasOnboarded,
-          theme:          state.theme,
-          currentUserId:  state.currentUserId,
-          needsIdentity:  state.needsIdentity,
-          users:          state.users,
-          groups:         state.groups,
-          expenses:       state.expenses,
-          settlements:    state.settlements,
-          activities:     state.activities,
-          friendBalances: state.friendBalances,
+          hasOnboarded:  state.hasOnboarded,
+          theme:         state.theme,
+          currentUserId: state.currentUserId,
+          needsIdentity: state.needsIdentity,
+          users:         state.users,
+          groups:        state.groups,
+          expenses:      state.expenses,
+          settlements:   state.settlements,
+          activities:    state.activities,
         }),
       },
     ),

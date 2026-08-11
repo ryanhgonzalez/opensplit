@@ -6,7 +6,7 @@ import Avatar from '../components/Avatar';
 import AddExpenseSheet from '../components/AddExpenseSheet';
 import AccountMenuSheet from '../components/AccountMenuSheet';
 import { CATEGORY_ICONS } from '../types';
-import { useStore, selectCurrentUser, selectOverallBalance, selectRecentExpenses } from '../store';
+import { useStore, selectCurrentUser, selectOverallBalance, selectRecentExpenses, selectGroupTotals } from '../store';
 import { formatCurrency, formatDate, getShareForUser } from '../utils';
 import './Dashboard.css';
 
@@ -33,8 +33,10 @@ export default function Dashboard() {
   const recentExpenses = useStore(selectRecentExpenses(4));
   const groups = useStore((s) => s.groups);
   const users = useStore((s) => s.users);
+  const groupTotals = useStore(selectGroupTotals);
 
   const getUserById = (id: string) => users.find((u) => u.id === id);
+  const balanceOf = (groupId: string) => groupTotals[groupId]?.yourBalance ?? 0;
   const isPositive = balance.net >= 0;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -76,7 +78,7 @@ export default function Dashboard() {
                   {formatCurrency(Math.abs(balance.net))}
                 </motion.p>
                 <p className="balance-hero-sub text-secondary text-sm">
-                  across {groups.filter((g) => g.yourBalance !== 0).length} groups
+                  across {groups.filter((g) => balanceOf(g.id) !== 0).length} groups
                 </p>
               </div>
               <div className="balance-breakdown">
@@ -216,10 +218,10 @@ export default function Dashboard() {
                   </div>
                   <span className="group-card-name">{group.name}</span>
                   <span
-                    className={`group-card-balance ${group.yourBalance >= 0 ? 'text-green' : 'text-red'}`}
+                    className={`group-card-balance ${balanceOf(group.id) >= 0 ? 'text-green' : 'text-red'}`}
                     style={{ fontSize: 13, fontWeight: 600 }}
                   >
-                    {group.yourBalance >= 0 ? '+' : ''}{formatCurrency(group.yourBalance)}
+                    {balanceOf(group.id) >= 0 ? '+' : ''}{formatCurrency(balanceOf(group.id))}
                   </span>
                 </div>
               </GlassCard>
