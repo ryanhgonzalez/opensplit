@@ -1,0 +1,193 @@
+.exf {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Search field ─────────────────────────────────────────────────────────── */
+
+.exf-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  color: var(--text-secondary);
+  border-radius: var(--radius-full) !important;
+}
+
+.exf-search-input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.exf-search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Safari draws its own clear affordance on type="search"; we ship our own. */
+.exf-search-input::-webkit-search-decoration,
+.exf-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.exf-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--fill-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.exf-clear:hover {
+  background: var(--fill-hover);
+  color: var(--text-primary);
+}
+
+/* ── Date presets ─────────────────────────────────────────────────────────── */
+
+.exf-presets {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  /* Bleed to the page edge so the row can scroll past the 20px page padding
+     without the chips looking clipped mid-scroll. */
+  margin: 0 -20px;
+  padding: 2px 20px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.exf-presets::-webkit-scrollbar {
+  display: none;
+}
+
+.exf-chip {
+  flex-shrink: 0;
+  padding: 7px 15px;
+  border-radius: var(--radius-full);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.exf-chip:hover {
+  color: var(--text-primary);
+  background: var(--glass-bg-hover);
+}
+
+.exf-chip.active {
+  background: var(--accent-blue-bg);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+/* ── Custom range ─────────────────────────────────────────────────────────── */
+
+.exf-range {
+  overflow: hidden;
+}
+
+.exf-range-inner {
+  display: flex;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.exf-range-field {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.exf-date-input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm) !important;
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text-primary);
+  outline: none;
+  /* iOS Safari otherwise renders date inputs with its own inset shadow and
+     centres the text, which breaks the glass surface. */
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+
+.exf-date-input:focus-visible {
+  border-color: var(--accent-blue);
+}
+
+/* The picker glyph is near-invisible against dark glass without this. */
+.exf-date-input::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+[data-theme='dark'] .exf-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* ── Result summary ───────────────────────────────────────────────────────── */
+
+.exf-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+}
+
+.exf-reset {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  cursor: pointer;
+}
+
+.exf-reset:hover {
+  opacity: 0.75;
+}
+
+/* ── Utilities ────────────────────────────────────────────────────────────── */
+
+.exf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

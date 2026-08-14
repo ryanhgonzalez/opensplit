@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore, selectCurrentUser, selectTotalsForGroup } from '../store';
 import { calculateBalances, calculateSettlements } from '../lib/calculations';
+import { EMPTY_FILTER, filterExpenses, isFilterActive, type ExpenseFilter } from '../lib/expenseFilter';
 import { formatCurrency, formatDate } from '../utils';
 import { CATEGORY_ICONS } from '../types';
 import type { Expense, PaymentMethod } from '../types';
@@ -12,6 +13,7 @@ import GlassCard from '../components/GlassCard';
 import AddExpenseSheet from '../components/AddExpenseSheet';
 import EditGroupSheet from '../components/EditGroupSheet';
 import PersonSheet from '../components/PersonSheet';
+import ExpenseFilterBar from '../components/ExpenseFilterBar';
 import SettleModal from '../components/SettleModal';
 import './GroupDetail.css';
 
@@ -43,6 +45,7 @@ export default function GroupDetail() {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [settling, setSettling] = useState<{ from: string; to: string; amount: number } | null>(null);
   const [undoPaymentId, setUndoPaymentId] = useState<string | null>(null);
+  const [expenseFilter, setExpenseFilter] = useState<ExpenseFilter>(EMPTY_FILTER);
 
   const users = useStore(s => s.users);
   const groups = useStore(s => s.groups);
@@ -67,6 +70,14 @@ export default function GroupDetail() {
     () => [...expenses].sort((a, b) => b.date.getTime() - a.date.getTime()),
     [expenses],
   );
+  // Only the list below is filtered. Balances, totals and suggested transfers
+  // are group truth and keep using the full `expenses` set — narrowing the view
+  // must never look like money moved.
+  const visibleExpenses = useMemo(
+    () => filterExpenses(sortedExpenses, expenseFilter, (uid) => users.find(u => u.id === uid)?.name ?? ''),
+    [sortedExpenses, expenseFilter, users],
+  );
+  const filtering = isFilterActive(expenseFilter);
   const sortedPayments = useMemo(
     () => [...groupSettlements].sort((a, b) => b.date.getTime() - a.date.getTime()),
     [groupSettlements],
@@ -348,8 +359,25 @@ export default function GroupDetail() {
           {/* Expenses */}
           <motion.div variants={itemVariants} className="mb-6 gd-section-expenses">
             <div className="section-header">
-              <h3>{hasExpenses ? `${expenses.length} Expense${expenses.length !== 1 ? 's' : ''}` : 'Expenses'}</h3>
+              <h3>
+                {!hasExpenses
+                  ? 'Expenses'
+                  : filtering
+                    ? `${visibleExpenses.length} of ${expenses.length} Expenses`
+                    : `${expenses.length} Expense${expenses.length !== 1 ? 's' : ''}`}
+              </h3>
             </div>
+            {hasExpenses && (
+              <div className="px-5 mb-4">
+                <ExpenseFilterBar
+                  value={expenseFilter}
+                  onChange={setExpenseFilter}
+                  matchCount={visibleExpenses.length}
+                  totalCount={expenses.length}
+                />
+              </div>
+            )}
+
             {!hasExpenses ? (
               <div className="px-5">
                 <GlassCard padding="40px 20px">
@@ -365,9 +393,21 @@ export default function GroupDetail() {
                   </div>
                 </GlassCard>
               </div>
+            ) : visibleExpenses.length === 0 ? (
+              <div className="px-5">
+                <GlassCard padding="32px 20px">
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
+                    <p style={{ fontSize: 32 }}>🔍</p>
+                    <p className="text-secondary">No expenses match these filters</p>
+                    <button className="gd-add-first-btn" onClick={() => setExpenseFilter(EMPTY_FILTER)}>
+                      Clear filters
+                    </button>
+                  </div>
+                </GlassCard>
+              </div>
             ) : (
               <div className="px-5" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {sortedExpenses.map(expense => {
+                {visibleExpenses.map(expense => {
                   const paidByUser = getUserById(expense.paidBy);
                   const isPaidByMe = expense.paidBy === currentUser.id;
                   const myEntry = expense.split.entries.find(e => e.userId === currentUser.id);
