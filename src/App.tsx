@@ -1,9 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useStore } from './store';
+import { readJoinLink } from './lib/joinLink';
+import { parseAndValidate } from './lib/dataExport';
 import BottomNav from './components/BottomNav';
 import SideNav from './components/SideNav';
+import ToastHost from './components/Toast';
+import ExportImportSheet from './components/ExportImportSheet';
 import Dashboard from './pages/Dashboard';
 import Groups from './pages/Groups';
 import GroupDetail from './pages/GroupDetail';
@@ -51,6 +55,28 @@ export default function App() {
   const hasOnboarded = useStore((s) => s.hasOnboarded);
   const needsIdentity = useStore((s) => s.needsIdentity);
   const theme = useStore((s) => s.theme);
+  /** Export JSON from a scanned QR code, waiting for the person to confirm the import. */
+  const [pendingJoin, setPendingJoin] = useState<string | null>(null);
+
+  // A QR code scanned with the phone camera opens /#join=<compressed group>.
+  // The fragment is consumed and cleared so a reload does not re-import it.
+  useEffect(() => {
+    const consume = () => {
+      const json = readJoinLink(window.location.hash);
+      if (!json) return;
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      if (!useStore.getState().hasOnboarded) {
+        // Brand-new device: the group becomes their data, then the identity gate asks who they are.
+        const result = parseAndValidate(json);
+        if (result.ok && result.data) useStore.getState().restoreAllData(result.data.data);
+      } else {
+        setPendingJoin(json);
+      }
+    };
+    consume();
+    window.addEventListener('hashchange', consume);
+    return () => window.removeEventListener('hashchange', consume);
+  }, []);
 
   // Apply theme to <html data-theme="..."> and keep it in sync
   useEffect(() => {
@@ -115,6 +141,19 @@ export default function App() {
           <BottomNav />
         </div>
       </div>
+
+      <ToastHost />
+
+      <AnimatePresence>
+        {pendingJoin && (
+          <ExportImportSheet
+            open
+            defaultTab="import"
+            initialJson={pendingJoin}
+            onClose={() => setPendingJoin(null)}
+          />
+        )}
+      </AnimatePresence>
     </BrowserRouter>
   );
 }

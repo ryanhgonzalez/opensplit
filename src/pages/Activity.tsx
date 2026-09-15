@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import Avatar from '../components/Avatar';
 import GlassCard from '../components/GlassCard';
-import { Activity } from '../types';
+import ExpenseFilterBar from '../components/ExpenseFilterBar';
+import { Activity, CATEGORY_LABELS } from '../types';
 import { useStore, selectActivities, selectCurrentUser } from '../store';
+import { EMPTY_FILTER, isFilterActive, resolveDateRange, type ExpenseFilter } from '../lib/expenseFilter';
 import {
   formatCurrency,
   formatDate,
@@ -49,11 +51,38 @@ export default function ActivityPage() {
   const getUserById = (id: string) => users.find((u) => u.id === id);
   const getGroupById = (id: string) => groups.find((g) => g.id === id);
 
-  const filtered = allActivities.filter((a) => {
+  const [search, setSearch] = useState<ExpenseFilter>(EMPTY_FILTER);
+
+  const byType = allActivities.filter((a) => {
     if (filter === 'expenses') return a.type === 'expense_added' || a.type === 'expense_updated';
     if (filter === 'payments') return a.type === 'payment' || a.type === 'settled';
     return true;
   });
+
+  // Search across every group: the sentence shown for the entry, the group
+  // name, and for expenses their description, notes, category and amount.
+  const filtered = useMemo(() => {
+    if (!isFilterActive(search)) return byType;
+    const { start, end } = resolveDateRange(search);
+    const terms = search.query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return byType.filter((a) => {
+      const when = a.date.getTime();
+      if (start && when < start.getTime()) return false;
+      if (end && when > end.getTime()) return false;
+      if (terms.length === 0) return true;
+      const parts: string[] = [getActivityDescription(a, currentUser.id, getExpenseById, getUserById)];
+      const group = a.groupId ? getGroupById(a.groupId) : undefined;
+      if (group) parts.push(group.name);
+      if (a.type === 'expense_added' || a.type === 'expense_updated') {
+        const e = getExpenseById(a.expenseId);
+        if (e) parts.push(e.description, e.notes ?? '', CATEGORY_LABELS[e.category], String(e.amount), e.amount.toFixed(2), getUserById(e.paidBy)?.name ?? '');
+      } else if (a.type === 'payment' || a.type === 'settled') {
+        parts.push(String(a.amount), a.amount.toFixed(2), getUserById(a.fromUserId)?.name ?? '', getUserById(a.toUserId)?.name ?? '');
+      }
+      const haystack = parts.join(' ').toLowerCase();
+      return terms.every((t) => haystack.includes(t));
+    });
+  }, [byType, search, currentUser.id, expenses, users, groups]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const grouped = groupByDate(filtered);
 
@@ -87,6 +116,16 @@ export default function ActivityPage() {
                 {f === 'all' ? 'All' : f === 'expenses' ? 'Expenses' : 'Payments'}
               </motion.button>
             ))}
+          </motion.div>
+
+          {/* Search across every group */}
+          <motion.div className="px-5 mb-4" variants={itemVariants}>
+            <ExpenseFilterBar
+              value={search}
+              onChange={setSearch}
+              matchCount={filtered.length}
+              totalCount={byType.length}
+            />
           </motion.div>
 
           {/* Activity feed */}

@@ -1,0 +1,143 @@
+/* ── Share & invite sheet (extends ExportImportSheet.css chrome) ─────────── */
+
+.sgs-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sgs-group-emoji {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.sgs-group-name {
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0 0 2px;
+}
+
+.sgs-steps {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sgs-steps li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.sgs-steps em {
+  font-style: normal;
+  color: var(--text-primary);
+}
+
+.sgs-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-blue-bg);
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.sgs-note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  margin: 0 0 12px;
+}
+
+.sgs-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sgs-secondary {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sgs-dot {
+  color: var(--text-tertiary);
+}
+
+/* QR hand-off */
+
+.sgs-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+}
+
+.sgs-qr-img {
+  width: min(280px, 100%);
+  height: auto;
+  border-radius: 16px;
+  background: #fff;
+  padding: 10px;
+  box-shadow: var(--shadow-md);
+}
+
+.sgs-qr-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.sgs-primary-row {
+  display: flex;
+  gap: 8px;
+}
+
+.sgs-primary-row .sheet-cta {
+  flex: 1;
+}
+
+.sgs-qr-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: var(--radius-full);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border-strong);
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.sgs-qr-btn:disabled {
+  opacity: 0.5;
+}

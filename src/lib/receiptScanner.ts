@@ -26,12 +26,28 @@ export interface ParsedReceipt {
 export type ScanProgress = (progress: number) => void;
 
 /** Scan a receipt image file and return best-effort expense fields. */
-export async function scanReceipt(file: File, onProgress?: ScanProgress): Promise<ParsedReceipt> {
+export async function scanReceipt(file: Blob, onProgress?: ScanProgress): Promise<ParsedReceipt> {
   const canvas = await preprocessImage(file);
 
   // Lazy-load Tesseract so it never bloats the main bundle — only fetched on first scan.
-  const { createWorker } = await import('tesseract.js');
+  const [{ createWorker }, { simd }] = await Promise.all([
+    import('tesseract.js'),
+    import('wasm-feature-detect'),
+  ]);
+
+  // Tesseract's defaults fetch the worker, the WASM core and the language data
+  // from the jsDelivr CDN at scan time, which made the scanner the one feature
+  // that needed a connection. Copies of all three live under public/tesseract
+  // and are precached by the service worker, so OCR works fully offline.
+  //
+  // The core is pinned to one file rather than a directory: Tesseract's own
+  // directory mode picks between three SIMD variants and we only ship two
+  // (relaxed SIMD is a marginal speed-up, not worth another 4 MB in the cache).
+  const coreFile = (await simd()) ? 'tesseract-core-simd-lstm.wasm.js' : 'tesseract-core-lstm.wasm.js';
   const worker = await createWorker('eng', 1, {
+    workerPath: '/tesseract/worker.min.js',
+    corePath: `/tesseract/${coreFile}`,
+    langPath: '/tesseract',
     logger: (m: { status: string; progress: number }) => {
       if (m.status === 'recognizing text') onProgress?.(m.progress);
     },
@@ -48,7 +64,7 @@ export async function scanReceipt(file: File, onProgress?: ScanProgress): Promis
 
 // ─── Image preprocessing (downscale + grayscale + mild contrast) ──────────────
 
-async function preprocessImage(file: File): Promise<HTMLCanvasElement> {
+async function preprocessImage(file: Blob): Promise<HTMLCanvasElement> {
   const url = URL.createObjectURL(file);
   try {
     const img = await loadImage(url);

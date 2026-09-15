@@ -5,6 +5,7 @@ import { buildSplit, round, splitByItems } from '../lib/calculations';
 import { CATEGORY_ICONS, CATEGORY_LABELS } from '../types';
 import type { Expense, ExpenseCategory, SplitType, ExpenseSplit } from '../types';
 import Avatar from './Avatar';
+import ReceiptCropModal from './ReceiptCropModal';
 import '../styles/sheet.css';
 import './AddExpenseSheet.css';
 
@@ -38,6 +39,8 @@ interface AddExpenseSheetProps {
   onClose: () => void;
   defaultGroupId?: string;
   editExpense?: Expense;
+  /** Pre-fill from this expense but save as a new one, dated today. */
+  duplicateFrom?: Expense;
 }
 
 // ─── Date-input helpers (local, timezone-safe) ────────────────────────────────
@@ -55,8 +58,10 @@ function fromDateInputValue(str: string): Date {
 let itemSeq = 0;
 const newItemId = () => `item-${Date.now()}-${itemSeq++}`;
 
-export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExpense }: AddExpenseSheetProps) {
+export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExpense, duplicateFrom }: AddExpenseSheetProps) {
   const isEditing = !!editExpense;
+  // What the form starts from: the expense being edited, or the one being copied.
+  const seed = editExpense ?? duplicateFrom;
   const currentUser = useStore(selectCurrentUser)!;
   const users = useStore(s => s.users);
   const groups = useStore(s => s.groups);
@@ -66,13 +71,14 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
   const initSplitType = (e?: Expense): SplitMode =>
     e?.split.type === 'percentage' ? 'exact' : (e?.split.type === 'shares' ? 'exact' : (e?.split.type ?? 'equal'));
 
-  const [description, setDescription] = useState(editExpense?.description ?? '');
-  const [amountStr, setAmountStr] = useState(editExpense ? String(editExpense.amount) : '');
-  const [category, setCategory] = useState<ExpenseCategory>(editExpense?.category ?? 'food');
+  const [description, setDescription] = useState(seed?.description ?? '');
+  const [amountStr, setAmountStr] = useState(seed ? String(seed.amount) : '');
+  const [category, setCategory] = useState<ExpenseCategory>(seed?.category ?? 'food');
+  // A duplicate is a new expense, so it is dated today rather than when the original was.
   const [dateStr, setDateStr] = useState(editExpense ? toDateInputValue(editExpense.date) : '');
-  const [groupId, setGroupId] = useState(editExpense?.groupId ?? defaultGroupId ?? '');
-  const [paidBy, setPaidBy] = useState(editExpense?.paidBy ?? currentUser.id);
-  const [splitType, setSplitType] = useState<SplitMode>(initSplitType(editExpense));
+  const [groupId, setGroupId] = useState(seed?.groupId ?? defaultGroupId ?? '');
+  const [paidBy, setPaidBy] = useState(seed?.paidBy ?? currentUser.id);
+  const [splitType, setSplitType] = useState<SplitMode>(initSplitType(seed));
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [lineItems, setLineItems] = useState<ItemRow[]>([]);
 
@@ -83,6 +89,18 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
   const [scanProgress, setScanProgress] = useState(0);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanned, setScanned] = useState(false);
+  /** The photo waiting to be cropped before OCR. */
+  const [pendingCrop, setPendingCrop] = useState<Blob | null>(null);
+  /** The (cropped) receipt, kept on screen so items can be assigned while looking at it. */
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [showReceipt, setShowReceipt] = useState(true);
+
+  const replaceReceiptUrl = (next: string | null) => {
+    setReceiptUrl(prev => {
+      if (prev) URL.revokeObjectURL(prev);
+      return next;
+    });
+  };
 
   const selectedGroup = useMemo(() => groups.find(g => g.id === groupId), [groups, groupId]);
   const groupMemberIds = useMemo(() => selectedGroup?.members.map(m => m.userId) ?? [], [selectedGroup]);
@@ -92,12 +110,12 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
   useEffect(() => {
     if (!selectedGroup) { setParticipants([]); return; }
 
-    if (editExpense && editExpense.groupId === selectedGroup.id) {
-      const eSplitType = initSplitType(editExpense);
+    if (seed && seed.groupId === selectedGroup.id) {
+      const eSplitType = initSplitType(seed);
       setSplitType(eSplitType);
       setParticipants(
         selectedGroup.members.map(m => {
-          const entry = editExpense.split.entries.find(e => e.userId === m.userId);
+          const entry = seed.split.entries.find(e => e.userId === m.userId);
           return {
             userId: m.userId,
             checked: !!entry,
@@ -213,18 +231,24 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
       ? { ...it, assigned: it.assigned.includes(userId) ? it.assigned.filter(u => u !== userId) : [...it.assigned, userId] }
       : it));
 
-  const handleReceiptSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // The photo goes through the crop step first; OCR only sees what is left.
+  const handleReceiptSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file later
     if (!file) return;
+    setPendingCrop(file);
+  };
 
+  const runScan = async (image: Blob) => {
+    replaceReceiptUrl(URL.createObjectURL(image));
+    setShowReceipt(true);
     setScanning(true);
     setScanError(null);
     setScanProgress(0);
     setScanned(false);
     try {
       const { scanReceipt } = await import('../lib/receiptScanner');
-      const result = await scanReceipt(file, setScanProgress);
+      const result = await scanReceipt(image, setScanProgress);
 
       let filledAny = false;
       if (result.amount && result.amount > 0) { setAmountStr(String(result.amount)); filledAny = true; }
@@ -304,25 +328,31 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
   };
 
   const handleClose = () => {
-    setDescription(editExpense?.description ?? '');
-    setAmountStr(editExpense ? String(editExpense.amount) : '');
-    setCategory(editExpense?.category ?? 'food');
+    setDescription(seed?.description ?? '');
+    setAmountStr(seed ? String(seed.amount) : '');
+    setCategory(seed?.category ?? 'food');
     setDateStr(editExpense ? toDateInputValue(editExpense.date) : '');
-    setGroupId(editExpense?.groupId ?? defaultGroupId ?? '');
-    setPaidBy(editExpense?.paidBy ?? currentUser.id);
-    setSplitType(initSplitType(editExpense));
+    setGroupId(seed?.groupId ?? defaultGroupId ?? '');
+    setPaidBy(seed?.paidBy ?? currentUser.id);
+    setSplitType(initSplitType(seed));
     setParticipants([]);
     setLineItems([]);
     setScanning(false);
     setScanProgress(0);
     setScanError(null);
     setScanned(false);
+    setPendingCrop(null);
+    replaceReceiptUrl(null);
     onClose();
   };
+
+  // Desktop only: with a receipt beside the items the sheet needs more room.
+  const wide = splitType === 'items' && !!receiptUrl;
 
   const ctaTotal = splitType === 'items' ? effectiveTotal : parsedAmount;
 
   return (
+    <>
     <AnimatePresence>
       {open && (
         <motion.div
@@ -333,7 +363,7 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
           onClick={handleClose}
         >
           <motion.div
-            className="sheet-panel"
+            className={`sheet-panel${wide ? ' aes-wide' : ''}`}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -342,7 +372,7 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
           >
             <div className="sheet-handle" />
             <div className="sheet-header">
-              <span className="sheet-title">{isEditing ? 'Edit Expense' : 'Add Expense'}</span>
+              <span className="sheet-title">{isEditing ? 'Edit Expense' : duplicateFrom ? 'Duplicate Expense' : 'Add Expense'}</span>
               <button className="sheet-close" onClick={handleClose} aria-label="Close">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
@@ -615,6 +645,23 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
                     </>
                   ) : (
                     /* ── Itemized split ── */
+                    <div className={`aes-items-layout${receiptUrl ? ' has-receipt' : ''}`}>
+                    {/* The scanned receipt stays in view so items can be assigned against it. */}
+                    {receiptUrl && (
+                      <div className="aes-receipt-panel">
+                        <div className="aes-receipt-head">
+                          <span className="text-xs text-secondary">Receipt</span>
+                          <button type="button" className="aes-receipt-toggle" onClick={() => setShowReceipt(v => !v)}>
+                            {showReceipt ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
+                        {showReceipt && (
+                          <div className="aes-receipt-scroll">
+                            <img src={receiptUrl} alt="Scanned receipt" />
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="aes-items">
                       <div className="aes-field-hint text-tertiary text-xs" style={{ marginBottom: 10 }}>
                         Add each item and tap who shared it. Set the amount above to include tax &amp; tip
@@ -725,6 +772,7 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
                         )}
                       </div>
                     </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -739,6 +787,18 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
         </motion.div>
       )}
     </AnimatePresence>
+
+    {/* Crop step between picking a photo and OCR. Sits above the sheet. */}
+    <AnimatePresence>
+      {pendingCrop && (
+        <ReceiptCropModal
+          file={pendingCrop}
+          onCancel={() => setPendingCrop(null)}
+          onConfirm={(image) => { setPendingCrop(null); void runScan(image); }}
+        />
+      )}
+    </AnimatePresence>
+    </>
   );
 }
 

@@ -16,6 +16,7 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
   const users = useStore((s) => s.users);
   const groups = useStore((s) => s.groups);
   const allExpenses = useStore((s) => s.expenses);
+  const allSettlements = useStore((s) => s.settlements);
 
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
@@ -53,8 +54,9 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
     try {
       const group = groups.find((g) => g.id === groupId)!;
       const expenses = allExpenses.filter((e) => e.groupId === groupId);
+      const settlements = allSettlements.filter((s) => s.groupId === groupId);
       const { generateGroupReport } = await import('../lib/groupReport');
-      generateGroupReport(group, expenses, users);
+      generateGroupReport(group, expenses, users, settlements);
     } finally {
       setPdfLoadingId(null);
     }
