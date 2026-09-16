@@ -197,3 +197,8 @@
     grid-column: 1 / -1;
   }
 }
+
+.group-unshared {
+  color: var(--accent-amber);
+  font-weight: 600;
+}

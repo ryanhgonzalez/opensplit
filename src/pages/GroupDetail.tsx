@@ -15,6 +15,8 @@ import EditGroupSheet from '../components/EditGroupSheet';
 import PersonSheet from '../components/PersonSheet';
 import ExpenseFilterBar from '../components/ExpenseFilterBar';
 import SettleModal from '../components/SettleModal';
+import ShareGroupSheet from '../components/ShareGroupSheet';
+import { showToast } from '../store/toast';
 import './GroupDetail.css';
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -42,6 +44,10 @@ export default function GroupDetail() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseMenuId, setExpenseMenuId] = useState<string | null>(null);
   const [showEditGroup, setShowEditGroup] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [duplicateFrom, setDuplicateFrom] = useState<Expense | null>(null);
+  const restoreDeletedExpense = useStore(s => s.restoreDeletedExpense);
+  const groupSharedAt = useStore(s => s.groupSharedAt);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [settling, setSettling] = useState<{ from: string; to: string; amount: number } | null>(null);
   const [undoPaymentId, setUndoPaymentId] = useState<string | null>(null);
@@ -118,9 +124,25 @@ export default function GroupDetail() {
     setShowAddExpense(true);
   };
 
+  // Deletion is immediate but reversible: the toast's Undo puts everything back,
+  // which is friendlier than a confirmation dialog in front of every delete.
   const handleDeleteExpense = (expenseId: string) => {
-    deleteExpense(expenseId);
+    const deletion = deleteExpense(expenseId);
     setExpenseMenuId(null);
+    if (deletion) {
+      showToast({
+        message: `Deleted "${deletion.expense.description}"`,
+        actionLabel: 'Undo',
+        onAction: () => restoreDeletedExpense(deletion),
+      });
+    }
+  };
+
+  const openDuplicateExpense = (expense: Expense) => {
+    setEditingExpense(null);
+    setDuplicateFrom(expense);
+    setExpenseMenuId(null);
+    setShowAddExpense(true);
   };
 
   const handleSettle = (amount: number, method: PaymentMethod) => {
@@ -143,6 +165,15 @@ export default function GroupDetail() {
 
   const rightButtons = (
     <div style={{ display: 'flex', gap: 8 }}>
+      <button
+        className="gd-settings-btn"
+        onClick={() => setShowShare(true)}
+        aria-label="Share and invite"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+          <path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7M16 6l-4-4-4 4M12 2v13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
       <button
         className="gd-settings-btn"
         onClick={() => setShowEditGroup(true)}
@@ -194,6 +225,18 @@ export default function GroupDetail() {
                   <p style={{ fontWeight: 700, fontSize: 17 }}>{formatCurrency(totalSpent)}</p>
                 </div>
               </div>
+
+              {/* Shared once, and edited since: the others don't have these changes yet. */}
+              {(() => {
+                const sharedAt = groupSharedAt[group.id];
+                const unshared = !!sharedAt && group.lastActivity.getTime() > sharedAt.getTime();
+                return unshared ? (
+                  <button className="gd-unshared" onClick={() => setShowShare(true)}>
+                    <span className="gd-unshared-dot" aria-hidden />
+                    Changes not shared yet · Share
+                  </button>
+                ) : null;
+              })()}
 
               {/* Member chips — tappable to open PersonSheet */}
               <div className="gd-member-strip">
@@ -471,6 +514,17 @@ export default function GroupDetail() {
                             </button>
                             <div className="gd-action-divider" />
                             <button
+                              className="gd-action-edit"
+                              onClick={() => openDuplicateExpense(expense)}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                                <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                              Duplicate
+                            </button>
+                            <div className="gd-action-divider" />
+                            <button
                               className="gd-action-delete"
                               onClick={() => handleDeleteExpense(expense.id)}
                             >
@@ -510,11 +564,12 @@ export default function GroupDetail() {
       <AnimatePresence>
         {showAddExpense && (
           <AddExpenseSheet
-            key={editingExpense?.id ?? 'new-expense'}
+            key={editingExpense?.id ?? (duplicateFrom ? `dup-${duplicateFrom.id}` : 'new-expense')}
             open={showAddExpense}
-            onClose={() => { setShowAddExpense(false); setEditingExpense(null); }}
+            onClose={() => { setShowAddExpense(false); setEditingExpense(null); setDuplicateFrom(null); }}
             defaultGroupId={id}
             editExpense={editingExpense ?? undefined}
+            duplicateFrom={duplicateFrom ?? undefined}
           />
         )}
       </AnimatePresence>
@@ -530,6 +585,9 @@ export default function GroupDetail() {
           />
         )}
       </AnimatePresence>
+
+      {/* Share & invite */}
+      <ShareGroupSheet open={showShare} onClose={() => setShowShare(false)} group={group} />
 
       {/* Person sheet */}
       <AnimatePresence>

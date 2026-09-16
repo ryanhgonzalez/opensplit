@@ -1,4 +1,4 @@
-import type { User, Group, Expense, Settlement, Activity } from '../types';
+import type { User, Group, Expense, Settlement, Activity, Tombstone } from '../types';
 
 // ─── Schema constants ─────────────────────────────────────────────────────────
 
@@ -26,6 +26,8 @@ export interface ExportPayload {
   settlements: Settlement[];
   activities: Activity[];
   friendBalances: Record<string, number>;
+  /** Deletions, so a merge can remove what was removed elsewhere. Absent in older files. */
+  tombstones?: Tombstone[];
 }
 
 export interface AppExport {
@@ -44,14 +46,44 @@ export interface ParseResult {
   warnings: string[];
 }
 
+/** One field of an expense that differed between the two sides of a merge. */
+export interface MergeFieldChange {
+  field: string;
+  ours: string;
+  theirs: string;
+}
+
+/** An expense both sides had edited, and how the merge resolved it. */
+export interface MergeChange {
+  expenseId: string;
+  description: string;
+  /** `took-theirs`: the file's copy was newer. `kept-yours`: the local edit was newer. */
+  outcome: 'took-theirs' | 'kept-yours';
+  fields: MergeFieldChange[];
+}
+
 export interface ImportStats {
   usersAdded: number;
   groupsAdded: number;
   expensesAdded: number;
+  /** Existing expenses replaced by a newer edit from the file. */
+  expensesUpdated: number;
   settlementsAdded: number;
+  /** Local records removed because the file said they were deleted. */
+  removed: number;
+  /** Expenses that differed on both sides, with what changed. */
+  changes: MergeChange[];
 }
 
-export type ImportMode = 'new-group' | 'merge' | 'replace';
+/**
+ * - `join`: keep every record ID from the file so later exchanges of the same
+ *   group merge instead of duplicating. This is how a shared group is joined and
+ *   how contributions are pulled back in.
+ * - `new-group`: a detached copy with fresh IDs; nothing existing is touched.
+ * - `merge`: add records from a full backup that are not already present.
+ * - `replace`: wipe and restore a full backup.
+ */
+export type ImportMode = 'join' | 'new-group' | 'merge' | 'replace';
 
 // ─── Export builders ──────────────────────────────────────────────────────────
 
@@ -124,18 +156,51 @@ export function buildGroupExport(state: ExportPayload, groupId: string): AppExpo
       settlements: groupSettlements,
       activities: groupActivities,
       friendBalances,
+      tombstones: (state.tombstones ?? []).filter(
+        (t) => t.groupId === groupId || (t.kind === 'group' && t.id === groupId),
+      ),
     },
   };
 }
 
 // ─── File download ────────────────────────────────────────────────────────────
 
-export function downloadExport(data: AppExport): void {
+export function exportFilename(data: AppExport): string {
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const slug = data.exportType === 'group'
     ? `group-${(data.meta.groupName ?? 'group').replace(/\s+/g, '_')}`
     : 'full';
-  const filename = `opensplit-${slug}-${ts}.json`;
+  return `opensplit-${slug}-${ts}.json`;
+}
+
+/** The export as a File, ready for the Web Share API or a download link. */
+export function exportToFile(data: AppExport): File {
+  return new File([JSON.stringify(data, null, 2)], exportFilename(data), { type: 'application/json' });
+}
+
+/**
+ * Hands the export to the device's share sheet (AirDrop, Messages, WhatsApp…)
+ * when the browser supports sharing files, otherwise falls back to a download.
+ * Returns which path was taken; `cancelled` when the person dismissed the sheet.
+ */
+export async function shareExport(data: AppExport): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  const file = exportToFile(data);
+  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+  if (typeof nav.share === 'function' && nav.canShare?.({ files: [file] })) {
+    try {
+      await nav.share({ files: [file], title: data.meta.groupName ?? 'OpenSplit' });
+      return 'shared';
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return 'cancelled';
+      // Some browsers advertise file sharing and then refuse; a download still works.
+    }
+  }
+  downloadExport(data);
+  return 'downloaded';
+}
+
+export function downloadExport(data: AppExport): void {
+  const filename = exportFilename(data);
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -342,5 +407,134 @@ export function remapForNewGroup(
     settlements: remappedSettlements,
     activities: remappedActivities,
     friendBalances: remappedBalances,
+    // A detached copy has fresh IDs, so no deletion from the file can refer to it.
+    tombstones: [],
+  };
+}
+
+// ─── Identity resolution — used for "Join group" and "Merge" ─────────────────
+
+/**
+ * Finds the local person a user from a file refers to: the same ID, an ID
+ * either side has recorded as an alias, or the same email address.
+ */
+export function resolveUserId(fileUser: User, existingUsers: User[]): string | undefined {
+  const fileIds = new Set([fileUser.id, ...(fileUser.aliases ?? [])]);
+  const match = existingUsers.find((u) => {
+    if (fileIds.has(u.id)) return true;
+    if (u.aliases?.some((a) => fileIds.has(a))) return true;
+    return !!fileUser.email && !!u.email && fileUser.email.toLowerCase() === u.email.toLowerCase();
+  });
+  return match?.id;
+}
+
+/** Whether the importer already appears in the file under any known identity. */
+export function fileIncludesUser(exported: AppExport, existingUsers: User[], appCurrentUserId: string): boolean {
+  return exported.data.users.some((u) => resolveUserId(u, existingUsers) === appCurrentUserId);
+}
+
+export interface AliasAddition {
+  userId: string;
+  alias: string;
+}
+
+export interface MergePrep {
+  payload: ExportPayload;
+  /** Foreign IDs to remember on local people so the next exchange matches them again. */
+  aliasAdditions: AliasAddition[];
+}
+
+/**
+ * Prepares a file for merging while keeping every record ID intact.
+ *
+ * Group, expense, settlement and activity IDs are preserved so that when the
+ * same group travels back and forth between devices the records line up and
+ * merge rather than multiply. Only user IDs are rewritten, and only so that
+ * each person in the file maps onto the one local profile that is them:
+ *
+ * @param selfIdInFile Which person in the file the importer is. `undefined`
+ *   leaves it to `resolveUserId` (the importer is already known in the file);
+ *   `null` means they are in none of them.
+ */
+export function prepareMerge(
+  exported: AppExport,
+  existingUsers: User[],
+  appCurrentUserId: string,
+  selfIdInFile?: string | null,
+): MergePrep {
+  const idMap = new Map<string, string>();
+  const aliasAdditions: AliasAddition[] = [];
+  const newUsers: User[] = [];
+
+  const remember = (userId: string, alias: string) => {
+    if (userId !== alias) aliasAdditions.push({ userId, alias });
+  };
+
+  if (selfIdInFile) idMap.set(selfIdInFile, appCurrentUserId);
+
+  for (const u of exported.data.users) {
+    if (u.id === selfIdInFile) {
+      remember(appCurrentUserId, u.id);
+      for (const a of u.aliases ?? []) remember(appCurrentUserId, a);
+      continue;
+    }
+    const resolved = resolveUserId(u, existingUsers);
+    if (resolved) {
+      idMap.set(u.id, resolved);
+      remember(resolved, u.id);
+      for (const a of u.aliases ?? []) remember(resolved, a);
+    } else {
+      idMap.set(u.id, u.id);
+      newUsers.push({ ...u, aliases: u.aliases ? [...u.aliases] : undefined });
+    }
+  }
+
+  const remapId = (id: string) => idMap.get(id) ?? id;
+
+  const groups: Group[] = exported.data.groups.map((g) => ({
+    ...g,
+    members: g.members.map((m) => ({ ...m, userId: remapId(m.userId) })),
+  }));
+
+  const expenses: Expense[] = exported.data.expenses.map((e) => ({
+    ...e,
+    paidBy: remapId(e.paidBy),
+    split: { ...e.split, entries: e.split.entries.map((en) => ({ ...en, userId: remapId(en.userId) })) },
+  }));
+
+  const settlements: Settlement[] = exported.data.settlements.map((s) => ({
+    ...s,
+    fromUserId: remapId(s.fromUserId),
+    toUserId: remapId(s.toUserId),
+  }));
+
+  const activities: Activity[] = exported.data.activities.map((a) => {
+    const base: Record<string, unknown> = { ...a, actorId: remapId(a.actorId) };
+    if ('fromUserId' in a) base.fromUserId = remapId(a.fromUserId as string);
+    if ('toUserId' in a) base.toUserId = remapId(a.toUserId as string);
+    return base as unknown as Activity;
+  });
+
+  // Dedupe alias additions and drop any that name a person's own ID.
+  const seen = new Set<string>();
+  const uniqueAliases = aliasAdditions.filter(({ userId, alias }) => {
+    const key = `${userId}\u0000${alias}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return {
+    payload: {
+      currentUserId: appCurrentUserId,
+      users: newUsers,
+      groups,
+      expenses,
+      settlements,
+      activities,
+      friendBalances: {},
+      tombstones: exported.data.tombstones ?? [],
+    },
+    aliasAdditions: uniqueAliases,
   };
 }

@@ -18,6 +18,8 @@ export interface ExpenseUpdatedActivity extends BaseActivity {
 export interface ExpenseDeletedActivity extends BaseActivity {
   type: 'expense_deleted';
   expenseDescription: string;
+  /** Which expense was deleted, so an undo can drop this entry again. Absent on older records. */
+  expenseId?: string;
 }
 
 export interface PaymentActivity extends BaseActivity {
