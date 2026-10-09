@@ -143,19 +143,6 @@ export default function GroupDetail() {
 
   return (
     <div className="gd-shell">
-      {/* Mobile top bar */}
-      <div className="gd-topbar">
-        <button className="gd-icon-btn" onClick={() => navigate('/groups')} aria-label="Back to groups">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <span className="gd-topbar-title">Groups</span>
-        <button className="gd-icon-btn" onClick={() => setShowEditGroup(true)} aria-label="Group settings">
-          {settingsIcon}
-        </button>
-      </div>
-
       <div className="page-content">
         <div className="gd">
           {/* Header */}
@@ -165,6 +152,10 @@ export default function GroupDetail() {
               <div className="gd-title-row">
                 <GroupTile group={group} size={40} />
                 <h1 className="gd-title">{group.name}</h1>
+                {/* Phones only: desktop has the labelled Group settings button */}
+                <button className="gd-icon-btn gd-settings-mobile" onClick={() => setShowEditGroup(true)} aria-label="Group settings">
+                  {settingsIcon}
+                </button>
               </div>
               <div className="gd-members">
                 {group.members.map(m => {

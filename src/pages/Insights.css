@@ -17,15 +17,41 @@
   margin-top: 4px;
 }
 
+/* Phones: both controls share one row, each button stretching to fill it. */
 .ins-controls {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
+  width: 100%;
+}
+
+.ins-controls .seg {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.ins-controls .seg > button {
+  flex: 1 1 auto;
+  padding: 0 6px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .ins-figure {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 500;
+}
+
+/* Three stats on one row, even on a phone */
+.insights-page .statement {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.insights-page .statement > * {
+  padding: 12px 10px;
+}
+
+.insights-page .statement > :first-child {
+  padding-left: 0;
 }
 
 .ins-charts {
@@ -347,8 +373,25 @@
     font-size: 34px;
   }
 
+  .ins-controls {
+    width: auto;
+  }
+
+  .ins-controls .seg {
+    flex: none;
+  }
+
+  .ins-controls .seg > button {
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
   .ins-figure {
     font-size: 26px;
+  }
+
+  .insights-page .statement > * {
+    padding: 14px 16px;
   }
 
   .ins-charts {
