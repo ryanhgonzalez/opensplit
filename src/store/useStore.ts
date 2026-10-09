@@ -671,6 +671,8 @@ export const useStore = create<AppStore>()(
           ),
       }),
       {
+        // Predates the rename to OpenSplitwise. Changing the storage key would
+        // leave every existing user's saved data behind under the old one.
         name: 'opensplit-v2',
         storage: persistStorage,
         version: 2,

@@ -16,7 +16,7 @@ export default function SideNav() {
   return (
     <>
       <aside className="side-nav">
-        <span className="side-nav-wordmark">OpenSplit</span>
+        <span className="side-nav-wordmark">OpenSplitwise</span>
 
         <nav className="side-nav-items" aria-label="Main">
           {NAV_ITEMS.map((tab) => (

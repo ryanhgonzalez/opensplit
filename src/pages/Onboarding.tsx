@@ -102,7 +102,7 @@ export default function Onboarding() {
       if (result.ok && result.data) {
         restoreAllData(result.data.data);
       } else {
-        setImportError(result.errors[0] ?? 'That file could not be read as an OpenSplit backup.');
+        setImportError(result.errors[0] ?? 'That file could not be read as an OpenSplitwise backup.');
       }
     };
     reader.readAsText(file);
@@ -135,7 +135,7 @@ export default function Onboarding() {
           >
             {/* Heading */}
             <motion.div className="ob-heading" variants={item}>
-              <h1 className="ob-title">Welcome to OpenSplit</h1>
+              <h1 className="ob-title">Welcome to OpenSplitwise</h1>
               <p className="ob-subtitle">Split expenses with anyone, settle up without the awkwardness.</p>
             </motion.div>
 
@@ -185,7 +185,7 @@ export default function Onboarding() {
               </button>
               <p className="ob-secondary-hint">
                 Switching devices, or has someone shared their expenses with you? Import their
-                OpenSplit&nbsp;.json — you&apos;ll pick which person you are next.
+                OpenSplitwise&nbsp;.json — you&apos;ll pick which person you are next.
               </p>
             </motion.div>
           </motion.div>

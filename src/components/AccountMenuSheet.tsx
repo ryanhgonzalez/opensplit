@@ -299,7 +299,7 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
               <h3 className="ams-wipe-title">Full Data Wipe</h3>
               <p className="ams-wipe-text">
                 This permanently deletes <strong>all</strong> of your groups, expenses, people, and
-                activity, and resets OpenSplit to its first-launch state. This cannot be undone.
+                activity, and resets OpenSplitwise to its first-launch state. This cannot be undone.
               </p>
               <label className="ams-wipe-label" htmlFor="ams-wipe-input">
                 Type <strong>{currentUser.name}</strong> to confirm

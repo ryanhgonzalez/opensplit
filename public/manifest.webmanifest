@@ -1,6 +1,6 @@
 {
-  "name": "OpenSplit",
-  "short_name": "OpenSplit",
+  "name": "OpenSplitwise",
+  "short_name": "OpenSplitwise",
   "description": "Split group expenses and settle up with ease.",
   "start_url": "/",
   "scope": "/",
