@@ -25,22 +25,13 @@ export default function Groups() {
   const groups = useStore((s) => s.groups);
   const users = useStore((s) => s.users);
   const groupTotals = useStore(selectGroupTotals);
-  const groupSharedAt = useStore((s) => s.groupSharedAt);
 
   const getUserById = (id: string) => users.find((u) => u.id === id);
-  const hasUnshared = (g: { id: string; lastActivity: Date }) => {
-    const sharedAt = groupSharedAt[g.id];
-    return !!sharedAt && g.lastActivity.getTime() > sharedAt.getTime();
-  };
   const totalsOf = (groupId: string) => groupTotals[groupId] ?? { yourBalance: 0, totalSpent: 0 };
 
   const filtered = groups.filter((g) =>
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  // Net across every group: positive means you are owed overall.
-  const net = groups.reduce((sum, g) => sum + totalsOf(g.id).yourBalance, 0);
-  const netEven = Math.abs(net) < 0.005;
 
   return (
     <div className="page-content">
@@ -99,11 +90,11 @@ export default function Groups() {
               </div>
               <div className="summary-pill glass-pill">
                 <span className="text-sm text-secondary">Net balance</span>
-                <span
-                  className={netEven ? 'text-secondary' : net > 0 ? 'text-green' : 'text-red'}
-                  style={{ fontWeight: 700, fontSize: 18 }}
-                >
-                  {netEven ? 'Settled' : `${net > 0 ? '+' : '-'}${formatCurrency(net)}`}
+                <span className="text-green" style={{ fontWeight: 700, fontSize: 18 }}>
+                  +{formatCurrency(
+                    groups.reduce((sum, g) => sum + Math.max(totalsOf(g.id).yourBalance, 0), 0) -
+                    groups.reduce((sum, g) => sum + Math.max(-totalsOf(g.id).yourBalance, 0), 0)
+                  )}
                 </span>
               </div>
             </div>
@@ -140,9 +131,6 @@ export default function Groups() {
                               <h3 className="group-name">{group.name}</h3>
                               <span className="text-xs text-secondary">
                                 {group.members.length} members · Last active {formatDate(group.lastActivity)}
-                                {hasUnshared(group) && (
-                                  <span className="group-unshared"> · Unshared changes</span>
-                                )}
                               </span>
                             </div>
                             <div className="group-balance-badge" style={{

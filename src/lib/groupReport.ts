@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
-import type { Group, Expense, User, Settlement } from '../types';
+import type { Group, Expense, User } from '../types';
 import { CATEGORY_LABELS } from '../types';
 import { calculateBalances, calculateSettlements } from './calculations';
 
@@ -133,8 +133,6 @@ export function generateGroupReport(
   group: Group,
   expenses: Expense[],
   users: User[],
-  /** Payments already marked complete, so the report shows what is still owed. */
-  completedPayments: Settlement[] = [],
 ): void {
   const doc    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW  = doc.internal.pageSize.getWidth();
@@ -145,9 +143,8 @@ export function generateGroupReport(
   const getName = (id: string) => users.find((u) => u.id === id)?.name ?? 'Unknown';
   const memberIds = group.members.map((m) => m.userId);
   const sorted    = [...expenses].sort((a, b) => a.date.getTime() - b.date.getTime());
-  const balances  = calculateBalances({ expenses, memberIds, settlements: completedPayments });
-  const settlements = calculateSettlements({ expenses, memberIds, settlements: completedPayments });
-  const paymentsSorted = [...completedPayments].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const balances  = calculateBalances({ expenses, memberIds });
+  const settlements = calculateSettlements({ expenses, memberIds });
 
   const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
   const dates = expenses.map((e) => e.date.getTime());
@@ -361,12 +358,7 @@ export function generateGroupReport(
       return s + (e.split.entries.find((en) => en.userId === m.userId)?.amount ?? 0);
     }, 0);
     const net = balances[m.userId] ?? 0;
-    // Money already handed over: paying moves you up, receiving moves you down.
-    const payments = completedPayments.reduce(
-      (s, p) => s + (p.fromUserId === m.userId ? p.amount : 0) - (p.toUserId === m.userId ? p.amount : 0),
-      0,
-    );
-    return { name: getName(m.userId), paid, share, payments, net };
+    return { name: getName(m.userId), paid, share, net };
   });
 
   autoTable(doc, {
@@ -416,7 +408,6 @@ export function generateGroupReport(
   const balanceNote =
     'A positive balance means other members owe this person money (they paid more than their share). ' +
     'A negative balance means this person owes money to others (they paid less than their share). ' +
-    'Payments already marked complete in the app are applied on top, so the net is what is still outstanding. ' +
     'The sum of all balances is always $0.00.';
   const splitNote = doc.splitTextToSize(balanceNote, cw);
   doc.text(splitNote, margin, y + 6);
@@ -426,7 +417,7 @@ export function generateGroupReport(
   autoTable(doc, {
     startY: y,
     ...tableDefaults(margin),
-    head: [['Member', 'Paid (credit)', 'Share (debit)', 'Payments', 'Running Net', 'Verdict']],
+    head: [['Member', 'Paid (credit)', 'Share (debit)', 'Running Net', 'Verdict']],
     body: memberStats.map((ms) => {
       const verdict = Math.abs(ms.net) < 0.005
         ? 'Balanced'
@@ -436,10 +427,6 @@ export function generateGroupReport(
         { content: ms.name, styles: { fontStyle: 'bold' as const } },
         { content: `+${usd(ms.paid)}`,  styles: { halign: 'right' as const, textColor: C.green } },
         { content: `-${usd(ms.share)}`, styles: { halign: 'right' as const, textColor: C.red } },
-        {
-          content: Math.abs(ms.payments) < 0.005 ? '—' : `${ms.payments > 0 ? '+' : '-'}${usd(Math.abs(ms.payments))}`,
-          styles: { halign: 'right' as const, textColor: Math.abs(ms.payments) < 0.005 ? C.gray : ms.payments > 0 ? C.green : C.red },
-        },
         {
           content: `${ms.net >= 0 ? '+' : ''}${usd(ms.net)}`,
           styles: {
@@ -452,51 +439,15 @@ export function generateGroupReport(
       ];
     }),
     columnStyles: {
-      0: { cellWidth: 28 },
-      1: { cellWidth: 27, halign: 'right' },
-      2: { cellWidth: 27, halign: 'right' },
-      3: { cellWidth: 24, halign: 'right' },
-      4: { cellWidth: 26, halign: 'right' },
-      5: { cellWidth: 'auto' },
+      0: { cellWidth: 30 },
+      1: { cellWidth: 32, halign: 'right' },
+      2: { cellWidth: 32, halign: 'right' },
+      3: { cellWidth: 28, halign: 'right' },
+      4: { cellWidth: 'auto' },
     },
   });
 
   y = lastY(doc) + 10;
-
-  // ── Section 5b – Completed payments ────────────────────────────────────────
-
-  if (paymentsSorted.length > 0) {
-    if (y > pageH - 50) { doc.addPage(); y = 20; }
-    sectionHeader(doc, 'COMPLETED PAYMENTS', margin, y);
-    y += 6;
-
-    autoTable(doc, {
-      startY: y,
-      ...tableDefaults(margin),
-      head: [['Date', 'From', 'To', 'Method', 'Amount']],
-      body: paymentsSorted.map((p) => [
-        shortDate(p.date),
-        { content: getName(p.fromUserId), styles: { fontStyle: 'bold' as const } },
-        { content: getName(p.toUserId), styles: { fontStyle: 'bold' as const } },
-        p.paymentMethod ? p.paymentMethod.charAt(0).toUpperCase() + p.paymentMethod.slice(1) : '—',
-        { content: usd(p.amount), styles: { halign: 'right' as const, textColor: C.green, fontStyle: 'bold' as const } },
-      ]),
-      foot: [[
-        { content: 'TOTAL PAID', colSpan: 4, styles: { fontStyle: 'bold' as const } },
-        { content: usd(paymentsSorted.reduce((s, p) => s + p.amount, 0)), styles: { halign: 'right' as const, fontStyle: 'bold' as const } },
-      ]],
-      footStyles: { fillColor: C.purpleLight, textColor: C.purple, fontStyle: 'bold' },
-      columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 40 },
-        3: { cellWidth: 30 },
-        4: { cellWidth: 'auto', halign: 'right' },
-      },
-    });
-
-    y = lastY(doc) + 10;
-  }
 
   // ── Section 6 – Settlement Transactions ────────────────────────────────────
 

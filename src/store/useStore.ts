@@ -12,9 +12,8 @@ import type {
   ExpenseDeletedActivity,
   PaymentActivity,
   SettledActivity,
-  Tombstone,
 } from '../types';
-import type { ExportPayload, ImportStats, AliasAddition, MergeChange, MergeFieldChange } from '../lib/dataExport';
+import type { ExportPayload, ImportStats } from '../lib/dataExport';
 import { round, outstandingByGroup, allocatePayment } from '../lib/calculations';
 
 // ─── Action input types ───────────────────────────────────────────────────────
@@ -65,18 +64,6 @@ export interface AppStore {
   expenses: Expense[];
   settlements: Settlement[];
   activities: Activity[];
-  /** Records deleted here, kept so the deletion can travel through shared files. */
-  tombstones: Tombstone[];
-
-  // ── Backup tracking ──
-  /** When a full backup was last exported; null if never. */
-  lastBackupAt: Date | null;
-  /** Edits made since that backup. Drives the reminder on the dashboard. */
-  changesSinceBackup: number;
-  /** The reminder stays hidden until this passes. */
-  backupSnoozedUntil: Date | null;
-  /** groupId → when its file was last shared or saved from this device. */
-  groupSharedAt: Record<string, Date>;
 
   // ── Theme ──
   setTheme: (theme: ThemeMode) => void;
@@ -93,10 +80,7 @@ export interface AppStore {
   // ── Expense actions ──
   addExpense: (input: AddExpenseInput) => Expense;
   updateExpense: (id: string, updates: UpdateExpenseInput) => void;
-  /** Removes an expense and returns what an undo needs, or undefined if it did not exist. */
-  deleteExpense: (id: string) => ExpenseDeletion | undefined;
-  /** Puts a just-deleted expense back exactly as it was. */
-  restoreDeletedExpense: (deletion: ExpenseDeletion) => void;
+  deleteExpense: (id: string) => void;
 
   // ── Group actions ──
   createGroup: (input: CreateGroupInput) => Group;
@@ -122,27 +106,10 @@ export interface AppStore {
 
   // ── Import actions ──
   restoreAllData: (payload: ExportPayload) => void;
-  mergeImportData: (payload: ExportPayload, aliasAdditions?: AliasAddition[]) => ImportStats;
-
-  // ── Backups & sharing ──
-  /** A full backup was just exported: reset the reminder. */
-  markBackedUp: () => void;
-  /** Hide the backup reminder for a while. */
-  snoozeBackupReminder: (days: number) => void;
-  /** This group's file was just shared or saved from here. */
-  markGroupShared: (groupId: string) => void;
+  mergeImportData: (payload: ExportPayload) => ImportStats;
 
   // ── Danger zone ──
   wipeAllData: () => void;
-}
-
-/** Everything needed to undo a `deleteExpense`. */
-export interface ExpenseDeletion {
-  expense: Expense;
-  /** The add/update feed entries that were dropped with it. */
-  removedActivities: Activity[];
-  /** The "deleted" feed entry the deletion wrote. */
-  deletionActivityId: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -186,33 +153,6 @@ function debtCleared(
 
 function touchGroups(groups: Group[], groupIds: Set<string>, when: Date): Group[] {
   return groups.map((g) => (groupIds.has(g.id) ? { ...g, lastActivity: when } : g));
-}
-
-/**
- * The fields on which two copies of one expense disagree, worded for the
- * import summary. Empty when they are the same expense in every way that counts.
- */
-function diffExpenses(ours: Expense, theirs: Expense, nameOf: (id: string) => string): MergeFieldChange[] {
-  const out: MergeFieldChange[] = [];
-  const money = (n: number) => `$${n.toFixed(2)}`;
-  const day = (d: Date) => d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  const splitText = (e: Expense) =>
-    [...e.split.entries]
-      .sort((a, b) => a.userId.localeCompare(b.userId))
-      .map((en) => `${nameOf(en.userId)} ${money(en.amount)}`)
-      .join(', ');
-
-  if (ours.description !== theirs.description) out.push({ field: 'Description', ours: ours.description, theirs: theirs.description });
-  if (Math.abs(ours.amount - theirs.amount) >= 0.005) out.push({ field: 'Amount', ours: money(ours.amount), theirs: money(theirs.amount) });
-  if (ours.paidBy !== theirs.paidBy) out.push({ field: 'Paid by', ours: nameOf(ours.paidBy), theirs: nameOf(theirs.paidBy) });
-  if (ours.date.getTime() !== theirs.date.getTime()) out.push({ field: 'Date', ours: day(ours.date), theirs: day(theirs.date) });
-  if (ours.category !== theirs.category) out.push({ field: 'Category', ours: ours.category, theirs: theirs.category });
-  if (ours.groupId !== theirs.groupId) out.push({ field: 'Group', ours: ours.groupId ?? '—', theirs: theirs.groupId ?? '—' });
-  if ((ours.notes ?? '') !== (theirs.notes ?? '')) out.push({ field: 'Notes', ours: ours.notes ?? '—', theirs: theirs.notes ?? '—' });
-  const oursSplit = splitText(ours);
-  const theirsSplit = splitText(theirs);
-  if (oursSplit !== theirsSplit) out.push({ field: 'Split', ours: oursSplit, theirs: theirsSplit });
-  return out;
 }
 
 /**
@@ -281,11 +221,6 @@ export const useStore = create<AppStore>()(
         expenses: [],
         settlements: [],
         activities: [],
-        tombstones: [],
-        lastBackupAt: null,
-        changesSinceBackup: 0,
-        backupSnoozedUntil: null,
-        groupSharedAt: {},
 
         // ── Theme ────────────────────────────────────────────────────────────
 
@@ -344,7 +279,6 @@ export const useStore = create<AppStore>()(
               expenses: [...expenses, expense],
               activities: [activity, ...activities],
               groups: input.groupId ? touchGroups(groups, new Set([input.groupId]), now) : groups,
-              changesSinceBackup: get().changesSinceBackup + 1,
             },
             false,
             'addExpense',
@@ -378,7 +312,6 @@ export const useStore = create<AppStore>()(
               expenses: expenses.map((e) => (e.id === id ? updated : e)),
               activities: [activity, ...activities],
               groups: touchGroups(groups, touched, now),
-              changesSinceBackup: get().changesSinceBackup + 1,
             },
             false,
             'updateExpense',
@@ -386,9 +319,9 @@ export const useStore = create<AppStore>()(
         },
 
         deleteExpense: (id) => {
-          const { currentUserId, expenses, groups, activities, tombstones } = get();
+          const { currentUserId, expenses, groups, activities } = get();
           const expense = expenses.find((e) => e.id === id);
-          if (!expense) return undefined;
+          if (!expense) return;
 
           const now = new Date();
           const activity: ExpenseDeletedActivity = {
@@ -396,49 +329,29 @@ export const useStore = create<AppStore>()(
             type: 'expense_deleted',
             actorId: currentUserId,
             expenseDescription: expense.description,
-            expenseId: id,
             groupId: expense.groupId,
             date: now,
           };
 
-          // The add/update entries point at an expense that no longer exists;
-          // the deletion entry it leaves behind is the record of what happened.
-          const removedActivities = activities.filter(
-            (a) => (a.type === 'expense_added' || a.type === 'expense_updated') && a.expenseId === id,
-          );
-          const removedIds = new Set(removedActivities.map((a) => a.id));
-
           set(
             {
               expenses: expenses.filter((e) => e.id !== id),
-              activities: [activity, ...activities.filter((a) => !removedIds.has(a.id))],
-              groups: expense.groupId ? touchGroups(groups, new Set([expense.groupId]), now) : groups,
-              tombstones: [
-                ...tombstones.filter((t) => !(t.kind === 'expense' && t.id === id)),
-                { id, kind: 'expense', groupId: expense.groupId, deletedAt: now },
+              // The add/update entries point at an expense that no longer exists;
+              // the deletion entry it leaves behind is the record of what happened.
+              activities: [
+                activity,
+                ...activities.filter(
+                  (a) =>
+                    !(
+                      (a.type === 'expense_added' || a.type === 'expense_updated') &&
+                      a.expenseId === id
+                    ),
+                ),
               ],
-              changesSinceBackup: get().changesSinceBackup + 1,
+              groups: expense.groupId ? touchGroups(groups, new Set([expense.groupId]), now) : groups,
             },
             false,
             'deleteExpense',
-          );
-
-          return { expense, removedActivities, deletionActivityId: activity.id };
-        },
-
-        restoreDeletedExpense: ({ expense, removedActivities, deletionActivityId }) => {
-          const { expenses, activities, tombstones } = get();
-          if (expenses.some((e) => e.id === expense.id)) return;
-          set(
-            {
-              expenses: [...expenses, expense],
-              // Order does not matter here: the feed sorts by date on read.
-              activities: [...removedActivities, ...activities.filter((a) => a.id !== deletionActivityId)],
-              tombstones: tombstones.filter((t) => !(t.kind === 'expense' && t.id === expense.id)),
-              changesSinceBackup: get().changesSinceBackup + 1,
-            },
-            false,
-            'restoreDeletedExpense',
           );
         },
 
@@ -447,35 +360,25 @@ export const useStore = create<AppStore>()(
         createGroup: (input) => {
           const now = new Date();
           const group: Group = { ...input, id: uid(), lastActivity: now, createdAt: now };
-          set({ groups: [...get().groups, group], changesSinceBackup: get().changesSinceBackup + 1 }, false, 'createGroup');
+          set({ groups: [...get().groups, group] }, false, 'createGroup');
           return group;
         },
 
         updateGroup: (id, updates) =>
           set(
-            { groups: get().groups.map((g) => (g.id === id ? { ...g, ...updates } : g)), changesSinceBackup: get().changesSinceBackup + 1 },
+            { groups: get().groups.map((g) => (g.id === id ? { ...g, ...updates } : g)) },
             false,
             'updateGroup',
           ),
 
         deleteGroup: (id) => {
-          const { groups, expenses, settlements, activities, tombstones, groupSharedAt } = get();
-          if (!groups.some((g) => g.id === id)) return;
-          const rest = { ...groupSharedAt };
-          delete rest[id];
+          const { groups, expenses, settlements, activities } = get();
           set(
             {
               groups: groups.filter((g) => g.id !== id),
               expenses: expenses.filter((e) => e.groupId !== id),
               settlements: settlements.filter((s) => s.groupId !== id),
               activities: activities.filter((a) => a.groupId !== id),
-              // One tombstone for the group covers everything inside it.
-              tombstones: [
-                ...tombstones.filter((t) => t.groupId !== id && !(t.kind === 'group' && t.id === id)),
-                { id, kind: 'group', groupId: id, deletedAt: new Date() },
-              ],
-              groupSharedAt: rest,
-              changesSinceBackup: get().changesSinceBackup + 1,
             },
             false,
             'deleteGroup',
@@ -489,7 +392,6 @@ export const useStore = create<AppStore>()(
                 if (g.id !== groupId || g.members.some((m) => m.userId === userId)) return g;
                 return { ...g, members: [...g.members, { userId, role: 'member', joinedAt: new Date() }] };
               }),
-              changesSinceBackup: get().changesSinceBackup + 1,
             },
             false,
             'addGroupMember',
@@ -501,7 +403,6 @@ export const useStore = create<AppStore>()(
               groups: get().groups.map((g) =>
                 g.id === groupId ? { ...g, members: g.members.filter((m) => m.userId !== userId) } : g,
               ),
-              changesSinceBackup: get().changesSinceBackup + 1,
             },
             false,
             'removeGroupMember',
@@ -542,7 +443,6 @@ export const useStore = create<AppStore>()(
               groups: settlement.groupId
                 ? touchGroups(groups, new Set([settlement.groupId]), now)
                 : groups,
-              changesSinceBackup: get().changesSinceBackup + 1,
             },
             false,
             'addSettlement',
@@ -611,7 +511,6 @@ export const useStore = create<AppStore>()(
               settlements: nextSettlements,
               activities: [...newActivities.reverse(), ...activities],
               groups: touchGroups(groups, touched, now),
-              changesSinceBackup: get().changesSinceBackup + 1,
             },
             false,
             'settleWithUser',
@@ -622,9 +521,8 @@ export const useStore = create<AppStore>()(
 
         /** Undo a payment that was marked complete — balances rewind to before it. */
         deleteSettlement: (id) => {
-          const { settlements, activities, tombstones } = get();
-          const settlement = settlements.find((s) => s.id === id);
-          if (!settlement) return;
+          const { settlements, activities } = get();
+          if (!settlements.some((s) => s.id === id)) return;
 
           set(
             {
@@ -633,11 +531,6 @@ export const useStore = create<AppStore>()(
               activities: activities.filter(
                 (a) => !((a.type === 'payment' || a.type === 'settled') && a.settlementId === id),
               ),
-              tombstones: [
-                ...tombstones.filter((t) => !(t.kind === 'settlement' && t.id === id)),
-                { id, kind: 'settlement', groupId: settlement.groupId, deletedAt: new Date() },
-              ],
-              changesSinceBackup: get().changesSinceBackup + 1,
             },
             false,
             'deleteSettlement',
@@ -648,13 +541,13 @@ export const useStore = create<AppStore>()(
 
         addUser: ({ name, email }) => {
           const user = { ...makeUser(name, get().users.length), email };
-          set({ users: [...get().users, user], changesSinceBackup: get().changesSinceBackup + 1 }, false, 'addUser');
+          set({ users: [...get().users, user] }, false, 'addUser');
           return user;
         },
 
         updateUser: (id, updates) =>
           set(
-            { users: get().users.map((u) => (u.id === id ? { ...u, ...updates } : u)), changesSinceBackup: get().changesSinceBackup + 1 },
+            { users: get().users.map((u) => (u.id === id ? { ...u, ...updates } : u)) },
             false,
             'updateUser',
           ),
@@ -684,15 +577,6 @@ export const useStore = create<AppStore>()(
             return true;
           });
 
-          const now = new Date();
-          const purgedSettlements = settlements.filter((s) => s.fromUserId === id || s.toUserId === id);
-          const newTombstones: Tombstone[] = [
-            ...expenses
-              .filter((e) => purgedExpenseIds.has(e.id))
-              .map((e): Tombstone => ({ id: e.id, kind: 'expense', groupId: e.groupId, deletedAt: now })),
-            ...purgedSettlements.map((s): Tombstone => ({ id: s.id, kind: 'settlement', groupId: s.groupId, deletedAt: now })),
-          ];
-
           set(
             {
               users: users.filter((u) => u.id !== id),
@@ -703,8 +587,6 @@ export const useStore = create<AppStore>()(
                 members: g.members.filter((m) => m.userId !== id),
               })),
               activities: remainingActivities,
-              tombstones: [...get().tombstones, ...newTombstones],
-              changesSinceBackup: get().changesSinceBackup + 1,
             },
             false,
             'deleteUser',
@@ -729,151 +611,33 @@ export const useStore = create<AppStore>()(
               expenses,
               settlements,
               activities,
-              tombstones: payload.tombstones ?? [],
-              // The data on hand now matches a file that exists, which is what a backup is.
-              lastBackupAt: new Date(),
-              changesSinceBackup: 0,
-              backupSnoozedUntil: null,
-              groupSharedAt: {},
             },
             false,
             'restoreAllData',
           );
         },
 
-        /**
-         * Folds a file into the local data. This is how contributions from a
-         * shared group come back: the same group, edited on another device.
-         *
-         * - New records are added.
-         * - An expense that exists on both sides keeps whichever copy was
-         *   edited last (`updatedAt`), so a fix made by a friend replaces the
-         *   stale original rather than being dropped.
-         * - A group that exists on both sides keeps its local look but gains
-         *   any members the file added.
-         * - Settlements and activities are append-only records; duplicates by
-         *   ID are skipped.
-         *
-         * Deletions cannot travel through a file — an expense removed on one
-         * device is simply absent from the file, which is indistinguishable
-         * from one that was never shared — so nothing here removes anything.
-         */
-        mergeImportData: (payload, aliasAdditions = []) => {
+        mergeImportData: (payload) => {
           const state = get();
-
-          // ── Deletions ──
-          //
-          // Both sides' tombstones are unioned, then applied to both sides'
-          // records. An expense edited after it was deleted elsewhere is kept:
-          // the later action wins, the same rule as for two competing edits.
-          const tombKey = (t: Tombstone) => `${t.kind}:${t.id}`;
-          const tombs = new Map<string, Tombstone>();
-          for (const t of state.tombstones) tombs.set(tombKey(t), t);
-          for (const t of payload.tombstones ?? []) {
-            const have = tombs.get(tombKey(t));
-            if (!have || t.deletedAt.getTime() > have.deletedAt.getTime()) tombs.set(tombKey(t), t);
-          }
-          for (const e of [...state.expenses, ...payload.expenses]) {
-            const t = tombs.get(`expense:${e.id}`);
-            if (t && e.updatedAt.getTime() > t.deletedAt.getTime()) tombs.delete(`expense:${e.id}`);
-          }
-          const deadGroup      = (id?: string) => !!id && tombs.has(`group:${id}`);
-          const deadExpense    = (e: Expense) => tombs.has(`expense:${e.id}`) || deadGroup(e.groupId);
-          const deadSettlement = (s: Settlement) => tombs.has(`settlement:${s.id}`) || deadGroup(s.groupId);
-
-          const keptGroups      = state.groups.filter((g) => !deadGroup(g.id));
-          const keptExpenses    = state.expenses.filter((e) => !deadExpense(e));
-          const keptSettlements = state.settlements.filter((s) => !deadSettlement(s));
-          const removedExpIds   = new Set(state.expenses.filter(deadExpense).map((e) => e.id));
-          const removedSetIds   = new Set(state.settlements.filter(deadSettlement).map((s) => s.id));
-          const keptActivities  = state.activities.filter((a) => {
-            if (deadGroup(a.groupId)) return false;
-            if ((a.type === 'expense_added' || a.type === 'expense_updated') && removedExpIds.has(a.expenseId)) return false;
-            if ((a.type === 'payment' || a.type === 'settled') && removedSetIds.has(a.settlementId)) return false;
-            return true;
-          });
-          const removed =
-            (state.groups.length - keptGroups.length) + removedExpIds.size + removedSetIds.size;
-
-          const incomingGroupsList      = payload.groups.filter((g) => !deadGroup(g.id));
-          const incomingExpenses        = payload.expenses.filter((e) => !deadExpense(e));
-          const incomingSettlements     = payload.settlements.filter((s) => !deadSettlement(s));
-          const incomingActivities      = payload.activities.filter((a) => !deadGroup(a.groupId));
-
           const existingUserIds  = new Set(state.users.map((u) => u.id));
-          const existingGroupIds = new Set(keptGroups.map((g) => g.id));
-          const existingSetIds   = new Set(keptSettlements.map((s) => s.id));
-          const existingActIds   = new Set(keptActivities.map((a) => a.id));
-          const localExpenses    = new Map(keptExpenses.map((e) => [e.id, e]));
+          const existingGroupIds = new Set(state.groups.map((g) => g.id));
+          const existingExpIds   = new Set(state.expenses.map((e) => e.id));
+          const existingSetIds   = new Set(state.settlements.map((s) => s.id));
+          const existingActIds   = new Set(state.activities.map((a) => a.id));
 
-          const newUsers = payload.users.filter((u) => !existingUserIds.has(u.id));
-          const nameOf = (id: string) =>
-            [...state.users, ...payload.users].find((u) => u.id === id)?.name ?? 'Unknown';
-
-          // Remember the IDs other devices know local people by.
-          const aliasesFor = new Map<string, Set<string>>();
-          for (const { userId, alias } of aliasAdditions) {
-            if (!aliasesFor.has(userId)) aliasesFor.set(userId, new Set());
-            aliasesFor.get(userId)!.add(alias);
-          }
-          const users = state.users.map((u) => {
-            const extra = aliasesFor.get(u.id);
-            if (!extra) return u;
-            const merged = new Set([...(u.aliases ?? []), ...extra]);
-            merged.delete(u.id);
-            return { ...u, aliases: [...merged] };
-          });
-
-          const incomingGroups = new Map(incomingGroupsList.map((g) => [g.id, g]));
-          const groups = keptGroups.map((local) => {
-            const incoming = incomingGroups.get(local.id);
-            if (!incoming) return local;
-            const have = new Set(local.members.map((m) => m.userId));
-            const added = incoming.members.filter((m) => !have.has(m.userId));
-            return added.length ? { ...local, members: [...local.members, ...added] } : local;
-          });
-          const newGroups = incomingGroupsList.filter((g) => !existingGroupIds.has(g.id));
-
-          const newExpenses: Expense[] = [];
-          const updatedExpenses = new Map<string, Expense>();
-          const changes: MergeChange[] = [];
-          for (const incoming of incomingExpenses) {
-            const local = localExpenses.get(incoming.id);
-            if (!local) {
-              newExpenses.push(incoming);
-              continue;
-            }
-            const fields = diffExpenses(local, incoming, nameOf);
-            if (fields.length === 0) continue;
-            const theirsNewer = incoming.updatedAt.getTime() > local.updatedAt.getTime();
-            if (theirsNewer) updatedExpenses.set(incoming.id, incoming);
-            changes.push({
-              expenseId: incoming.id,
-              description: theirsNewer ? incoming.description : local.description,
-              outcome: theirsNewer ? 'took-theirs' : 'kept-yours',
-              fields,
-            });
-          }
-          const expenses = [
-            ...keptExpenses.map((e) => updatedExpenses.get(e.id) ?? e),
-            ...newExpenses,
-          ];
-
-          const newSettlements = incomingSettlements.filter((s) => !existingSetIds.has(s.id));
-          const newActivities  = incomingActivities.filter((a) => !existingActIds.has(a.id));
-          const changed =
-            newUsers.length + newGroups.length + newExpenses.length + updatedExpenses.size +
-            newSettlements.length + removed;
+          const newUsers       = payload.users.filter((u) => !existingUserIds.has(u.id));
+          const newGroups      = payload.groups.filter((g) => !existingGroupIds.has(g.id));
+          const newExpenses    = payload.expenses.filter((e) => !existingExpIds.has(e.id));
+          const newSettlements = payload.settlements.filter((s) => !existingSetIds.has(s.id));
+          const newActivities  = payload.activities.filter((a) => !existingActIds.has(a.id));
 
           set(
             {
-              users:       [...users, ...newUsers],
-              groups:      [...groups, ...newGroups],
-              expenses,
-              settlements: [...keptSettlements, ...newSettlements],
-              activities:  [...keptActivities, ...newActivities],
-              tombstones:  [...tombs.values()],
-              changesSinceBackup: get().changesSinceBackup + changed,
+              users:       [...state.users, ...newUsers],
+              groups:      [...state.groups, ...newGroups],
+              expenses:    [...state.expenses, ...newExpenses],
+              settlements: [...state.settlements, ...newSettlements],
+              activities:  [...state.activities, ...newActivities],
             },
             false,
             'mergeImportData',
@@ -883,32 +647,9 @@ export const useStore = create<AppStore>()(
             usersAdded:       newUsers.length,
             groupsAdded:      newGroups.length,
             expensesAdded:    newExpenses.length,
-            expensesUpdated:  updatedExpenses.size,
             settlementsAdded: newSettlements.length,
-            removed,
-            changes,
           };
         },
-
-        // ── Danger zone ────────────────────────────────────────────────────────
-
-        // ── Backups & sharing ────────────────────────────────────────────────
-
-        markBackedUp: () =>
-          set({ lastBackupAt: new Date(), changesSinceBackup: 0, backupSnoozedUntil: null }, false, 'markBackedUp'),
-
-        snoozeBackupReminder: (days) => {
-          const until = new Date();
-          until.setDate(until.getDate() + days);
-          set({ backupSnoozedUntil: until }, false, 'snoozeBackupReminder');
-        },
-
-        markGroupShared: (groupId) =>
-          set(
-            { groupSharedAt: { ...get().groupSharedAt, [groupId]: new Date() } },
-            false,
-            'markGroupShared',
-          ),
 
         // ── Danger zone ────────────────────────────────────────────────────────
 
@@ -924,11 +665,6 @@ export const useStore = create<AppStore>()(
               expenses: [],
               settlements: [],
               activities: [],
-              tombstones: [],
-              lastBackupAt: null,
-              changesSinceBackup: 0,
-              backupSnoozedUntil: null,
-              groupSharedAt: {},
             },
             false,
             'wipeAllData',
@@ -937,7 +673,7 @@ export const useStore = create<AppStore>()(
       {
         name: 'opensplit-v2',
         storage: persistStorage,
-        version: 3,
+        version: 2,
         /**
          * v0/v1 kept `friendBalances` on the state and `yourBalance` / `totalSpent`
          * on each group, maintained by hand as actions ran. They are derived now,
@@ -968,32 +704,18 @@ export const useStore = create<AppStore>()(
             );
           }
 
-          // v3 added tombstones, backup tracking and per-group share stamps.
-          if (fromVersion < 3) {
-            state.tombstones ??= [];
-            state.lastBackupAt ??= null;
-            state.changesSinceBackup ??= 0;
-            state.backupSnoozedUntil ??= null;
-            state.groupSharedAt ??= {};
-          }
-
           return state as AppStore;
         },
         partialize: (state) => ({
-          hasOnboarded:       state.hasOnboarded,
-          theme:              state.theme,
-          currentUserId:      state.currentUserId,
-          needsIdentity:      state.needsIdentity,
-          users:              state.users,
-          groups:             state.groups,
-          expenses:           state.expenses,
-          settlements:        state.settlements,
-          activities:         state.activities,
-          tombstones:         state.tombstones,
-          lastBackupAt:       state.lastBackupAt,
-          changesSinceBackup: state.changesSinceBackup,
-          backupSnoozedUntil: state.backupSnoozedUntil,
-          groupSharedAt:      state.groupSharedAt,
+          hasOnboarded:  state.hasOnboarded,
+          theme:         state.theme,
+          currentUserId: state.currentUserId,
+          needsIdentity: state.needsIdentity,
+          users:         state.users,
+          groups:        state.groups,
+          expenses:      state.expenses,
+          settlements:   state.settlements,
+          activities:    state.activities,
         }),
       },
     ),

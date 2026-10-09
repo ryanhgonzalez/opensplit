@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore, selectFriendBalances } from '../store';
 import {
@@ -7,8 +7,6 @@ import {
   downloadExport,
   parseAndValidate,
   remapForNewGroup,
-  prepareMerge,
-  fileIncludesUser,
 } from '../lib/dataExport';
 import type { AppExport, ParseResult, ImportStats, ImportMode } from '../lib/dataExport';
 import './ExportImportSheet.css';
@@ -64,6 +62,7 @@ function StatusBanner({ type, children }: { type: 'success' | 'warning' | 'error
 }
 
 function ImportModeCard({
+  value: _value,
   selected,
   onSelect,
   title,
@@ -98,8 +97,6 @@ interface ExportImportSheetProps {
   onClose: () => void;
   defaultTab?: 'export' | 'import';
   defaultGroupId?: string;
-  /** Export JSON that arrived some other way (a scanned QR link) — opens straight into the import preview. */
-  initialJson?: string;
 }
 
 export default function ExportImportSheet({
@@ -107,7 +104,6 @@ export default function ExportImportSheet({
   onClose,
   defaultTab = 'export',
   defaultGroupId,
-  initialJson,
 }: ExportImportSheetProps) {
   const groups      = useStore((s) => s.groups);
   const users       = useStore((s) => s.users);
@@ -118,11 +114,8 @@ export default function ExportImportSheet({
   // versions can read these backups. On import it is ignored and recomputed.
   const friendBalances  = useStore(selectFriendBalances);
   const currentUserId   = useStore((s) => s.currentUserId);
-  const tombstones      = useStore((s) => s.tombstones);
   const restoreAllData  = useStore((s) => s.restoreAllData);
   const mergeImportData = useStore((s) => s.mergeImportData);
-  const markBackedUp    = useStore((s) => s.markBackedUp);
-  const markGroupShared = useStore((s) => s.markGroupShared);
 
   const [tab, setTab] = useState<'export' | 'import'>(defaultTab);
 
@@ -143,7 +136,7 @@ export default function ExportImportSheet({
   const [importStats,    setImportStats]    = useState<ImportStats | null>(null);
   const [importError,    setImportError]    = useState<string | null>(null);
 
-  const statePayload = { currentUserId, users, groups, expenses, settlements, activities, friendBalances, tombstones };
+  const statePayload = { currentUserId, users, groups, expenses, settlements, activities, friendBalances };
 
   // ── Export handlers ──────────────────────────────────────────────────────────
 
@@ -154,26 +147,11 @@ export default function ExportImportSheet({
         : buildGroupExport(statePayload, exportGroupId);
     if (!data) return;
     downloadExport(data);
-    // A saved file is a backup of everything in it.
-    if (exportTarget === 'full') markBackedUp();
-    else markGroupShared(exportGroupId);
     setExportDone(true);
     setTimeout(() => setExportDone(false), 3000);
   }
 
   // ── Import handlers ──────────────────────────────────────────────────────────
-
-  const handleText = useCallback((json: string) => {
-    const result = parseAndValidate(json);
-    setParseResult(result);
-    setImportStatus('idle');
-    setImportStats(null);
-    setReplaceAck(false);
-    setSelfIdInFile('');
-    if (result.ok && result.data) {
-      setImportMode(result.data.exportType === 'group' ? 'join' : 'merge');
-    }
-  }, []);
 
   const handleFile = useCallback((file: File) => {
     if (!file.name.endsWith('.json') && file.type !== 'application/json') {
@@ -181,17 +159,19 @@ export default function ExportImportSheet({
       return;
     }
     const reader = new FileReader();
-    reader.onload = (e) => handleText(e.target?.result as string);
+    reader.onload = (e) => {
+      const result = parseAndValidate(e.target?.result as string);
+      setParseResult(result);
+      setImportStatus('idle');
+      setImportStats(null);
+      setReplaceAck(false);
+      setSelfIdInFile('');
+      if (result.ok && result.data) {
+        setImportMode(result.data.exportType === 'group' ? 'new-group' : 'merge');
+      }
+    };
     reader.readAsText(file);
-  }, [handleText]);
-
-  // A join link (scanned QR code) lands here with the JSON already in hand.
-  useEffect(() => {
-    if (initialJson) {
-      setTab('import');
-      handleText(initialJson);
-    }
-  }, [initialJson, handleText]);
+  }, []);
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
@@ -217,21 +197,11 @@ export default function ExportImportSheet({
           usersAdded:       exported.data.users.length,
           groupsAdded:      exported.data.groups.length,
           expensesAdded:    exported.data.expenses.length,
-          expensesUpdated:  0,
           settlementsAdded: exported.data.settlements.length,
-          removed: 0,
-          changes: [],
         });
-      } else if (importMode === 'join') {
-        // Keep every record ID so the group stays the same group on both
-        // devices. Only the identity question needs answering, and only when
-        // the importer isn't already recognisable in the file.
-        const self = alreadyInFile ? undefined : selfIdInFile === NOT_IN_FILE ? null : selfIdInFile;
-        const { payload, aliasAdditions } = prepareMerge(exported, users, currentUserId, self);
-        setImportStats(mergeImportData(payload, aliasAdditions));
       } else if (importMode === 'merge') {
-        const { payload, aliasAdditions } = prepareMerge(exported, users, currentUserId);
-        setImportStats(mergeImportData(payload, aliasAdditions));
+        const stats = mergeImportData(exported.data);
+        setImportStats(stats);
       } else {
         // new-group: fold whoever the importer said they are into their own
         // account, remap the rest to fresh IDs, then merge.
@@ -262,20 +232,14 @@ export default function ExportImportSheet({
 
   // ── Derived ──────────────────────────────────────────────────────────────────
 
+  const canImport = parseResult?.ok &&
+    (importMode !== 'replace' || replaceAck) &&
+    (importMode !== 'new-group' || selfIdInFile !== '') &&
+    importStatus === 'idle';
+
   const exportedData = parseResult?.ok ? parseResult.data! : null;
   const isGroupExport = exportedData?.exportType === 'group';
   const isFullExport  = exportedData?.exportType === 'full';
-  /** The importer is already one of the people in the file (same ID, alias or email). */
-  const alreadyInFile = !!exportedData && fileIncludesUser(exportedData, users, currentUserId);
-  /** The shared group is already on this device, so "join" is really "pull in updates". */
-  const groupExists = !!exportedData && exportedData.data.groups.some((g) => groups.some((lg) => lg.id === g.id));
-  const needsIdentity =
-    importMode === 'new-group' || (importMode === 'join' && !alreadyInFile);
-
-  const canImport = parseResult?.ok &&
-    (importMode !== 'replace' || replaceAck) &&
-    (!needsIdentity || selfIdInFile !== '') &&
-    importStatus === 'idle';
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -417,49 +381,15 @@ export default function ExportImportSheet({
                         {[
                           { label: 'Groups added',       value: importStats.groupsAdded },
                           { label: 'Expenses added',     value: importStats.expensesAdded },
-                          { label: 'Expenses updated',   value: importStats.expensesUpdated },
                           { label: 'Settlements added',  value: importStats.settlementsAdded },
                           { label: 'Members added',      value: importStats.usersAdded },
-                          { label: 'Removed (deleted elsewhere)', value: importStats.removed },
                         ].filter((r) => r.value > 0).map((r) => (
                           <div key={r.label} className="eis-done-row">
                             <span className="eis-done-label">{r.label}</span>
                             <span className="eis-done-val">{r.value}</span>
                           </div>
                         ))}
-                        {importStats.changes.length > 0 && (
-                          <div className="eis-changes">
-                            <p className="eis-changes-title">
-                              {importStats.changes.length === 1
-                                ? 'One expense was edited on both sides'
-                                : `${importStats.changes.length} expenses were edited on both sides`}
-                            </p>
-                            {importStats.changes.map((c) => (
-                              <div key={c.expenseId} className="eis-change">
-                                <div className="eis-change-head">
-                                  <span className="eis-change-desc">{c.description}</span>
-                                  <span className={`eis-change-badge ${c.outcome}`}>
-                                    {c.outcome === 'took-theirs' ? 'Took theirs (newer)' : 'Kept yours (newer)'}
-                                  </span>
-                                </div>
-                                {c.fields.map((f) => (
-                                  <div key={f.field} className="eis-change-field">
-                                    <span className="eis-change-label">{f.field}</span>
-                                    <span className={c.outcome === 'took-theirs' ? 'eis-change-old' : 'eis-change-new'}>{f.ours}</span>
-                                    <span className="eis-change-arrow" aria-hidden>→</span>
-                                    <span className={c.outcome === 'took-theirs' ? 'eis-change-new' : 'eis-change-old'}>{f.theirs}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            ))}
-                          </div>
-                        )}
                         {importMode === 'replace' && <p className="eis-done-note">All previous data was replaced.</p>}
-                        {importMode !== 'replace' &&
-                          importStats.usersAdded + importStats.groupsAdded + importStats.expensesAdded +
-                            importStats.expensesUpdated + importStats.settlementsAdded === 0 && (
-                          <p className="eis-done-note">Everything in that file was already here.</p>
-                        )}
                       </div>
                       <button className="eis-text-btn" onClick={resetImport}>Import another file</button>
                     </div>
@@ -562,21 +492,17 @@ export default function ExportImportSheet({
 
                             {isGroupExport && (
                               <ImportModeCard
-                                value="join"
-                                selected={importMode === 'join'}
-                                onSelect={() => setImportMode('join')}
-                                title={groupExists ? 'Merge updates into this group' : 'Join this group'}
-                                description={
-                                  groupExists
-                                    ? 'New expenses and payments are added and newer edits win. Nothing is deleted.'
-                                    : 'Adds the shared group so you can log expenses in it and share them back.'
-                                }
+                                value="new-group"
+                                selected={importMode === 'new-group'}
+                                onSelect={() => setImportMode('new-group')}
+                                title="Import as new group"
+                                description="Creates fresh copies with new IDs. Safe to use — nothing existing is changed."
                               />
                             )}
 
                             {/* The file was written from its author's point of view. Without
                                 this the importer silently inherits the author's identity. */}
-                            {needsIdentity && (
+                            {importMode === 'new-group' && (
                               <div className="field-group" style={{ margin: '4px 0 12px' }}>
                                 <label className="field-label" htmlFor="eis-self">
                                   Which of these people are you?
@@ -604,25 +530,13 @@ export default function ExportImportSheet({
                               </div>
                             )}
 
-                            {isGroupExport && (
-                              <ImportModeCard
-                                value="new-group"
-                                selected={importMode === 'new-group'}
-                                onSelect={() => setImportMode('new-group')}
-                                title="Import as a separate copy"
-                                description="A detached copy with new IDs. Later files for this group will not merge into it."
-                              />
-                            )}
-
-                            {isFullExport && (
-                              <ImportModeCard
-                                value="merge"
-                                selected={importMode === 'merge'}
-                                onSelect={() => setImportMode('merge')}
-                                title="Merge with existing data"
-                                description="Adds new items from the file and keeps newer edits. Nothing is deleted."
-                              />
-                            )}
+                            <ImportModeCard
+                              value="merge"
+                              selected={importMode === 'merge'}
+                              onSelect={() => setImportMode('merge')}
+                              title="Merge with existing data"
+                              description="Adds new items from the file, skipping anything that already exists."
+                            />
 
                             {isFullExport && (
                               <>
@@ -681,13 +595,7 @@ export default function ExportImportSheet({
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ marginRight: 7, verticalAlign: 'middle' }}>
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  {importMode === 'replace'
-                    ? 'Replace & Restore'
-                    : importMode === 'merge'
-                      ? 'Merge Data'
-                      : importMode === 'join'
-                        ? groupExists ? 'Merge Updates' : 'Join Group'
-                        : 'Import as Copy'}
+                  {importMode === 'replace' ? 'Replace & Restore' : importMode === 'merge' ? 'Merge Data' : 'Import as New Group'}
                 </button>
               ) : importStatus === 'done' ? (
                 <button className="sheet-cta" onClick={onClose}>Done</button>

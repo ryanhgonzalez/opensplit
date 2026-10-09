@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import GlassCard from '../components/GlassCard';
 import Avatar from '../components/Avatar';
 import AddExpenseSheet from '../components/AddExpenseSheet';
 import AccountMenuSheet from '../components/AccountMenuSheet';
-import ExportImportSheet from '../components/ExportImportSheet';
 import { CATEGORY_ICONS } from '../types';
 import { useStore, selectCurrentUser, selectOverallBalance, selectRecentExpenses, selectGroupTotals } from '../store';
 import { formatCurrency, formatDate, getShareForUser } from '../utils';
@@ -27,31 +26,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<BalanceTab>('owed');
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
-  const [showBackup, setShowBackup] = useState(false);
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // The home-screen shortcut lands on /?action=add-expense.
-  useEffect(() => {
-    if (searchParams.get('action') === 'add-expense') {
-      setShowAddExpense(true);
-      setSearchParams({}, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
-
-  // Backup reminder: the only copy of this data is in this browser.
-  const changesSinceBackup = useStore((s) => s.changesSinceBackup);
-  const lastBackupAt = useStore((s) => s.lastBackupAt);
-  const backupSnoozedUntil = useStore((s) => s.backupSnoozedUntil);
-  const expenseCount = useStore((s) => s.expenses.length);
-  const snoozeBackupReminder = useStore((s) => s.snoozeBackupReminder);
-  const daysSinceBackup = lastBackupAt ? Math.floor((Date.now() - lastBackupAt.getTime()) / 86_400_000) : null;
-  const snoozed = !!backupSnoozedUntil && backupSnoozedUntil.getTime() > Date.now();
-  const backupDue =
-    !snoozed &&
-    (changesSinceBackup >= 15 ||
-      (daysSinceBackup !== null && daysSinceBackup >= 30 && changesSinceBackup > 0) ||
-      (lastBackupAt === null && expenseCount >= 10));
 
   const currentUser = useStore(selectCurrentUser)!;
   const balance = useStore(selectOverallBalance);
@@ -87,26 +62,6 @@ export default function Dashboard() {
             </div>
           </div>
         </motion.div>
-
-        {/* Backup reminder */}
-        {backupDue && (
-          <motion.div className="px-5 mb-4" variants={itemVariants}>
-            <div className="dash-backup glass-sm">
-              <div className="dash-backup-text">
-                <span className="dash-backup-title">Back up your data</span>
-                <span className="text-xs text-secondary">
-                  {lastBackupAt === null
-                    ? 'Never backed up. This browser holds the only copy.'
-                    : `${changesSinceBackup} change${changesSinceBackup === 1 ? '' : 's'} since your last backup${daysSinceBackup !== null && daysSinceBackup > 0 ? `, ${daysSinceBackup} day${daysSinceBackup === 1 ? '' : 's'} ago` : ''}.`}
-                </span>
-              </div>
-              <div className="dash-backup-actions">
-                <button className="dash-backup-later" onClick={() => snoozeBackupReminder(7)}>Later</button>
-                <button className="dash-backup-now" onClick={() => setShowBackup(true)}>Back up</button>
-              </div>
-            </div>
-          </motion.div>
-        )}
 
         {/* Net balance hero card */}
         <motion.div className="px-5 mb-4 dash-balance-hero" variants={itemVariants}>
@@ -305,12 +260,6 @@ export default function Dashboard() {
             open={showAccountMenu}
             onClose={() => setShowAccountMenu(false)}
           />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showBackup && (
-          <ExportImportSheet open={showBackup} onClose={() => setShowBackup(false)} defaultTab="export" />
         )}
       </AnimatePresence>
     </div>
