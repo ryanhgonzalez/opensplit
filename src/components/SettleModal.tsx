@@ -13,11 +13,11 @@ import './SettleModal.css';
  */
 export type SettleMode = 'settle' | 'remind';
 
-const paymentMethods: { id: PaymentMethod; label: string; icon: string; color: string }[] = [
-  { id: 'venmo', label: 'Venmo', icon: 'V', color: '#3d95ce' },
-  { id: 'cashapp', label: 'Cash App', icon: '$', color: '#00c244' },
-  { id: 'zelle', label: 'Zelle', icon: 'Z', color: '#6d1ed4' },
-  { id: 'cash', label: 'Cash', icon: '💵', color: '#10b981' },
+const paymentMethods: { id: PaymentMethod; label: string }[] = [
+  { id: 'venmo', label: 'Venmo' },
+  { id: 'cashapp', label: 'Cash App' },
+  { id: 'zelle', label: 'Zelle' },
+  { id: 'cash', label: 'Cash' },
 ];
 
 interface SettleModalProps {
@@ -129,7 +129,7 @@ export default function SettleModal({
       onClick={onClose}
     >
       <motion.div
-        className="settle-modal glass-strong"
+        className="settle-modal"
         initial={{ y: '100%', opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: '100%', opacity: 0 }}
@@ -229,15 +229,10 @@ export default function SettleModal({
                       <button
                         key={pm.id}
                         className={`payment-method-btn ${method === pm.id ? 'active' : ''}`}
+                        aria-pressed={method === pm.id}
                         onClick={() => setMethod(pm.id)}
-                        style={method === pm.id ? { borderColor: `${pm.color}60`, background: `${pm.color}18` } : {}}
                       >
-                        <div className="payment-icon" style={{ background: `${pm.color}25`, border: `1px solid ${pm.color}40` }}>
-                          <span style={{ fontSize: pm.icon.length > 1 ? 16 : 14, fontWeight: 800, color: pm.color }}>
-                            {pm.icon}
-                          </span>
-                        </div>
-                        <span className="payment-label">{pm.label}</span>
+                        {pm.label}
                       </button>
                     ))}
                   </div>
@@ -245,14 +240,9 @@ export default function SettleModal({
               )}
 
               <div className="modal-actions">
-                <button className="modal-cancel glass-btn" onClick={onClose}>Cancel</button>
+                <button className="modal-cancel" onClick={onClose}>Cancel</button>
                 <motion.button
                   className="modal-confirm"
-                  style={{
-                    background: isRemind
-                      ? 'linear-gradient(135deg, rgba(96,165,250,0.8), rgba(124,58,237,0.7))'
-                      : 'linear-gradient(135deg, rgba(52,211,153,0.85), rgba(45,212,191,0.7))',
-                  }}
                   onClick={handleConfirm}
                   disabled={!isRemind && !validAmount}
                   whileTap={{ scale: 0.97 }}

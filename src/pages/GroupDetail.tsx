@@ -1,15 +1,14 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore, selectCurrentUser, selectTotalsForGroup } from '../store';
-import { calculateBalances, calculateSettlements } from '../lib/calculations';
+import { calculateBalances, calculateSettlements, round } from '../lib/calculations';
 import { EMPTY_FILTER, filterExpenses, isFilterActive, type ExpenseFilter } from '../lib/expenseFilter';
-import { formatCurrency, formatDate } from '../utils';
-import { CATEGORY_ICONS } from '../types';
+import { formatCurrency, formatDate, formatLedgerDate, formatSigned, getNetAmountForUser } from '../utils';
+import { CATEGORY_LABELS } from '../types';
 import type { Expense, PaymentMethod } from '../types';
-import TopBar from '../components/TopBar';
 import Avatar from '../components/Avatar';
-import GlassCard from '../components/GlassCard';
+import GroupTile from '../components/GroupTile';
 import AddExpenseSheet from '../components/AddExpenseSheet';
 import EditGroupSheet from '../components/EditGroupSheet';
 import PersonSheet from '../components/PersonSheet';
@@ -25,14 +24,7 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   other: 'Other',
 };
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.36, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
-};
+const signClass = (n: number) => (Math.abs(n) < 0.005 ? 'zero' : n > 0 ? 'pos' : 'neg');
 
 export default function GroupDetail() {
   const { id } = useParams<{ id: string }>();
@@ -84,18 +76,8 @@ export default function GroupDetail() {
   );
 
   const getUserById = (uid: string) => users.find(u => u.id === uid);
-
-  const backBtn = (
-    <button
-      className="gd-back-btn"
-      onClick={() => navigate('/groups')}
-      aria-label="Back to groups"
-    >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-        <path d="M19 12H5M12 5L5 12L12 19" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </button>
-  );
+  const nameOf = (uid: string, lower = false) =>
+    uid === currentUser.id ? (lower ? 'you' : 'You') : getUserById(uid)?.name.split(' ')[0] ?? 'Unknown';
 
   // When the group is deleted from the store, navigate away instead of flashing a blank state.
   useEffect(() => {
@@ -111,6 +93,16 @@ export default function GroupDetail() {
   const settlements = calculateSettlements({ expenses, memberIds, settlements: groupSettlements });
   const myBalance = balances[currentUser.id] ?? 0;
   const hasExpenses = expenses.length > 0;
+
+  // What each member put in and what their split came to, for the balance rows.
+  const paidBy: Record<string, number> = {};
+  const shareOf: Record<string, number> = {};
+  for (const e of expenses) {
+    paidBy[e.paidBy] = (paidBy[e.paidBy] ?? 0) + e.amount;
+    for (const en of e.split.entries) shareOf[en.userId] = (shareOf[en.userId] ?? 0) + en.amount;
+  }
+
+  const openAddExpense = () => { setEditingExpense(null); setShowAddExpense(true); };
 
   const openEditExpense = (expense: Expense) => {
     setEditingExpense(expense);
@@ -141,370 +133,312 @@ export default function GroupDetail() {
     setUndoPaymentId(null);
   };
 
-  const rightButtons = (
-    <div style={{ display: 'flex', gap: 8 }}>
-      <button
-        className="gd-settings-btn"
-        onClick={() => setShowEditGroup(true)}
-        aria-label="Edit group"
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-          <path d="M11 4H4C3.44772 4 3 4.44772 3 5V20C3 20.5523 3.44772 21 4 21H19C19.5523 21 20 20.5523 20 19V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M18.5 2.5C19.3284 1.67157 20.6716 1.67157 21.5 2.5C22.3284 3.32843 22.3284 4.67157 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      <button
-        className="gd-add-btn"
-        onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
-        aria-label="Add expense"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-        </svg>
-      </button>
-    </div>
+  const settingsIcon = (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="16" cy="7" r="2" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="10" cy="17" r="2" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <TopBar
-        title={`${group.emoji} ${group.name}`}
-        left={backBtn}
-        right={rightButtons}
-      />
+    <div className="gd-shell">
+      {/* Mobile top bar */}
+      <div className="gd-topbar">
+        <button className="gd-icon-btn" onClick={() => navigate('/groups')} aria-label="Back to groups">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <span className="gd-topbar-title">Groups</span>
+        <button className="gd-icon-btn" onClick={() => setShowEditGroup(true)} aria-label="Group settings">
+          {settingsIcon}
+        </button>
+      </div>
 
       <div className="page-content">
-        <motion.div className="gd-page-body" variants={containerVariants} initial="hidden" animate="show">
-
-          {/* Group summary card */}
-          <motion.div variants={itemVariants} className="px-5 pt-4 mb-5 gd-section-summary">
-            <GlassCard variant="strong" padding="20px">
-              <div className="gd-summary-row">
-                <div>
-                  <p className="text-xs text-secondary" style={{ marginBottom: 4 }}>Your balance</p>
-                  <p
-                    className={Math.abs(myBalance) < 0.005 ? 'text-secondary' : myBalance > 0 ? 'text-green' : 'text-red'}
-                    style={{ fontSize: 28, fontWeight: 800, letterSpacing: -1 }}
-                  >
-                    {Math.abs(myBalance) < 0.005 ? 'Settled up' : `${myBalance > 0 ? '+' : ''}${formatCurrency(myBalance)}`}
-                  </p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p className="text-xs text-secondary" style={{ marginBottom: 4 }}>Total spent</p>
-                  <p style={{ fontWeight: 700, fontSize: 17 }}>{formatCurrency(totalSpent)}</p>
-                </div>
+        <div className="gd">
+          {/* Header */}
+          <header className="gd-header">
+            <div className="gd-title-block">
+              <Link to="/groups" className="gd-crumb">Groups /</Link>
+              <div className="gd-title-row">
+                <GroupTile group={group} size={40} />
+                <h1 className="gd-title">{group.name}</h1>
               </div>
-
-              {/* Member chips — tappable to open PersonSheet */}
-              <div className="gd-member-strip">
+              <div className="gd-members">
                 {group.members.map(m => {
                   const u = getUserById(m.userId);
                   if (!u) return null;
                   return (
                     <button
                       key={m.userId}
-                      className="gd-member-chip gd-member-chip-btn"
+                      className="gd-member"
                       onClick={() => setSelectedMemberId(m.userId)}
                     >
-                      <Avatar user={u} size="sm" showRing={m.userId === currentUser.id} />
-                      <span className="text-xs" style={{ color: m.userId === currentUser.id ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
-                        {m.userId === currentUser.id ? 'You' : u.name.split(' ')[0]}
-                      </span>
+                      <Avatar user={u} size="sm" />
+                      <span>{nameOf(m.userId)}</span>
                     </button>
                   );
                 })}
               </div>
-            </GlassCard>
-          </motion.div>
-
-          {/* Balances */}
-          <motion.div variants={itemVariants} className="mb-5 gd-section-balances">
-            <div className="section-header"><h3>Balances</h3></div>
-            <div className="px-5">
-              {!hasExpenses ? (
-                <GlassCard padding="18px 16px">
-                  <p className="text-sm text-secondary" style={{ textAlign: 'center' }}>
-                    Add an expense to see balances
-                  </p>
-                </GlassCard>
-              ) : (
-                group.members.map(m => {
-                  const u = getUserById(m.userId);
-                  if (!u) return null;
-                  const bal = balances[m.userId] ?? 0;
-                  const isMe = m.userId === currentUser.id;
-                  return (
-                    <div key={m.userId} className="gd-balance-row glass" style={{ marginBottom: 8 }}>
-                      <Avatar user={u} size="md" showRing={isMe} />
-                      <span className="gd-balance-name">{isMe ? 'You' : u.name}</span>
-                      <span className={
-                        Math.abs(bal) < 0.005 ? 'text-secondary gd-balance-amount'
-                          : bal > 0 ? 'text-green gd-balance-amount'
-                          : 'text-red gd-balance-amount'
-                      }>
-                        {Math.abs(bal) < 0.005
-                          ? 'settled up'
-                          : `${bal > 0 ? '+' : ''}${formatCurrency(bal)}`}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
             </div>
-          </motion.div>
+            <div className="gd-header-actions">
+              <button className="btn btn-secondary" onClick={() => setShowEditGroup(true)}>Group settings</button>
+              <button className="btn btn-primary" onClick={openAddExpense}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                Add expense
+              </button>
+            </div>
+          </header>
 
-          {/* Outstanding transfers */}
-          {settlements.length > 0 && (
-            <motion.div variants={itemVariants} className="mb-5 gd-section-settlements">
-              <div className="section-header"><h3>Settle Up</h3></div>
-              <div className="px-5">
-                {settlements.map((s, i) => {
-                  const from = getUserById(s.from);
-                  const to = getUserById(s.to);
-                  if (!from || !to) return null;
-                  const isMyDebt = s.from === currentUser.id;
-                  const isMyCredit = s.to === currentUser.id;
-                  return (
-                    <div key={i} className="gd-settlement-row glass" style={{ marginBottom: 8 }}>
-                      <Avatar user={from} size="md" />
-                      <div className="gd-settlement-info">
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>
-                          <span style={{ color: isMyDebt ? 'var(--accent-red)' : 'var(--text-primary)' }}>
-                            {isMyDebt ? 'You' : from.name.split(' ')[0]}
-                          </span>
-                          <span className="text-secondary"> → </span>
-                          <span style={{ color: isMyCredit ? 'var(--accent-green)' : 'var(--text-primary)' }}>
-                            {isMyCredit ? 'you' : to.name.split(' ')[0]}
-                          </span>
-                        </span>
-                      </div>
-                      <span className={isMyDebt ? 'text-red' : isMyCredit ? 'text-green' : 'text-secondary'}
-                        style={{ fontWeight: 700, fontSize: 15 }}>
-                        {formatCurrency(s.amount)}
-                      </span>
-                      <Avatar user={to} size="md" />
-                      <motion.button
-                        className="gd-settle-btn"
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setSettling({ from: s.from, to: s.to, amount: s.amount })}
-                      >
-                        {isMyDebt ? 'Pay' : isMyCredit ? 'Mark Paid' : 'Settle'}
-                      </motion.button>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
+          {/* Statement */}
+          <section className="statement gd-statement" aria-label="Group summary">
+            <div>
+              <span className="cap">Total spent</span>
+              <span className="num gd-figure">{formatCurrency(totalSpent)}</span>
+            </div>
+            <div>
+              <span className="cap">
+                {Math.abs(myBalance) < 0.005 ? 'Your balance' : myBalance > 0 ? 'You are owed' : 'You owe'}
+              </span>
+              <span className={`gd-figure gd-figure-strong ${Math.abs(myBalance) < 0.005 ? 'zero' : `num ${signClass(myBalance)}`}`}>
+                {Math.abs(myBalance) < 0.005 ? 'Settled up' : formatSigned(myBalance)}
+              </span>
+            </div>
+            <div className="gd-statement-extra">
+              <span className="cap">Still to settle</span>
+              <span className="num gd-figure">
+                {settlements.length} transfer{settlements.length === 1 ? '' : 's'}
+              </span>
+            </div>
+          </section>
 
-          {/* Completed payments */}
-          {sortedPayments.length > 0 && (
-            <motion.div variants={itemVariants} className="mb-5 gd-section-payments">
-              <div className="section-header">
-                <h3>{sortedPayments.length} Payment{sortedPayments.length !== 1 ? 's' : ''}</h3>
-              </div>
-              <div className="px-5">
-                {sortedPayments.map(p => {
-                  const from = getUserById(p.fromUserId);
-                  const to = getUserById(p.toUserId);
-                  if (!from || !to) return null;
-                  const confirming = undoPaymentId === p.id;
-                  return (
-                    <div key={p.id} className="gd-payment-row glass" style={{ marginBottom: 8 }}>
-                      <div className="gd-payment-check">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                          <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                      <div className="gd-payment-info">
-                        <span className="gd-payment-title">
-                          {p.fromUserId === currentUser.id ? 'You' : from.name.split(' ')[0]}
-                          {' paid '}
-                          {p.toUserId === currentUser.id ? 'you' : to.name.split(' ')[0]}
+          <div className="gd-grid">
+            {/* Outstanding transfers */}
+            {settlements.length > 0 && (
+              <section className="gd-area-settle">
+                <h2 className="gd-h2">To settle</h2>
+                <div className="ruled">
+                  {settlements.map((s, i) => {
+                    const isMyDebt = s.from === currentUser.id;
+                    const isMyCredit = s.to === currentUser.id;
+                    return (
+                      <div key={i} className="gd-transfer">
+                        <span className="gd-transfer-text">
+                          <strong>{nameOf(s.from)}</strong>
+                          <span className="text-secondary"> pays </span>
+                          <strong>{nameOf(s.to, true)}</strong>
                         </span>
-                        <span className="text-xs text-secondary">
-                          {formatDate(p.date)}
-                          {p.paymentMethod ? ` · ${PAYMENT_METHOD_LABELS[p.paymentMethod]}` : ''}
-                        </span>
+                        <span className="num gd-transfer-amount">{formatCurrency(s.amount)}</span>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setSettling({ from: s.from, to: s.to, amount: s.amount })}
+                        >
+                          {isMyDebt ? 'Pay' : isMyCredit ? 'Mark paid' : 'Settle'}
+                        </button>
                       </div>
-                      <span className="text-green gd-payment-amount">{formatCurrency(p.amount)}</span>
-                      {confirming ? (
-                        <div className="gd-payment-confirm">
-                          <button className="gd-payment-cancel" onClick={() => setUndoPaymentId(null)}>
-                            Keep
-                          </button>
-                          <button className="gd-payment-undo-confirm" onClick={() => handleUndoPayment(p.id)}>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* Completed payments */}
+            {sortedPayments.length > 0 && (
+              <section className="gd-area-payments">
+                <h2 className="gd-h2">Completed payments</h2>
+                <div className="ruled">
+                  {sortedPayments.map(p => {
+                    const confirming = undoPaymentId === p.id;
+                    return (
+                      <div key={p.id} className="gd-payment">
+                        <span className="gd-payment-info">
+                          <span>
+                            <strong>{nameOf(p.fromUserId)}</strong>
+                            <span className="text-secondary"> paid </span>
+                            <strong>{nameOf(p.toUserId, true)}</strong>
+                          </span>
+                          <span className="num gd-payment-meta">
+                            {formatLedgerDate(p.date)}
+                            {p.paymentMethod ? ` · ${PAYMENT_METHOD_LABELS[p.paymentMethod].toUpperCase()}` : ''}
+                          </span>
+                        </span>
+                        <span className="num gd-payment-amount">{formatCurrency(p.amount)}</span>
+                        {confirming ? (
+                          <span className="gd-payment-confirm">
+                            <button className="btn btn-secondary btn-sm" onClick={() => setUndoPaymentId(null)}>Keep</button>
+                            <button className="btn btn-danger-solid btn-sm" onClick={() => handleUndoPayment(p.id)}>Undo</button>
+                          </span>
+                        ) : (
+                          <button
+                            className="gd-undo"
+                            onClick={() => setUndoPaymentId(p.id)}
+                            aria-label="Undo this payment"
+                          >
                             Undo
                           </button>
-                        </div>
-                      ) : (
-                        <button
-                          className="gd-payment-undo"
-                          onClick={() => setUndoPaymentId(p.id)}
-                          aria-label="Undo this payment"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                            <path d="M3 10H16C18.7614 10 21 12.2386 21 15C21 17.7614 18.7614 20 16 20H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d="M7 6L3 10L7 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
-          {/* Expenses */}
-          <motion.div variants={itemVariants} className="mb-6 gd-section-expenses">
-            <div className="section-header">
-              <h3>
-                {!hasExpenses
-                  ? 'Expenses'
-                  : filtering
-                    ? `${visibleExpenses.length} of ${expenses.length} Expenses`
-                    : `${expenses.length} Expense${expenses.length !== 1 ? 's' : ''}`}
-              </h3>
-            </div>
-            {hasExpenses && (
-              <div className="px-5 mb-4">
+            {/* Expenses */}
+            <section className="gd-area-expenses">
+              <div className="gd-section-head">
+                <h2 className="gd-h2">Expenses</h2>
+                {hasExpenses && (
+                  <span className="num text-xs text-secondary">
+                    {filtering ? `${visibleExpenses.length} of ${expenses.length}` : expenses.length}
+                  </span>
+                )}
+              </div>
+
+              {hasExpenses && (
                 <ExpenseFilterBar
                   value={expenseFilter}
                   onChange={setExpenseFilter}
                   matchCount={visibleExpenses.length}
                   totalCount={expenses.length}
                 />
-              </div>
-            )}
+              )}
 
-            {!hasExpenses ? (
-              <div className="px-5">
-                <GlassCard padding="40px 20px">
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
-                    <p style={{ fontSize: 36 }}>💸</p>
-                    <p className="text-secondary">No expenses yet</p>
-                    <button
-                      className="gd-add-first-btn"
-                      onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
-                    >
-                      Add the first expense
-                    </button>
+              {!hasExpenses ? (
+                <div className="empty-box">
+                  <span className="empty-box-title">No expenses yet</span>
+                  <span className="text-secondary">Add the first expense for this group.</span>
+                  <button className="btn btn-primary" onClick={openAddExpense}>Add expense</button>
+                </div>
+              ) : visibleExpenses.length === 0 ? (
+                <div className="empty-box">
+                  <span className="empty-box-title">No matches</span>
+                  <span className="text-secondary">No expenses match these filters.</span>
+                  <button className="btn btn-secondary" onClick={() => setExpenseFilter(EMPTY_FILTER)}>
+                    Clear filters
+                  </button>
+                </div>
+              ) : (
+                <div className="gd-table" role="table" aria-label="Expenses">
+                  <div className="gd-row gd-row-head" role="row">
+                    <span role="columnheader" className="cap">Date</span>
+                    <span role="columnheader" className="cap">Description</span>
+                    <span role="columnheader" className="cap gd-col-wide">Paid by</span>
+                    <span role="columnheader" className="cap gd-col-wide gd-right">Amount</span>
+                    <span role="columnheader" className="cap gd-right">Your share</span>
+                    <span role="columnheader"><span className="sr-only">Actions</span></span>
                   </div>
-                </GlassCard>
-              </div>
-            ) : visibleExpenses.length === 0 ? (
-              <div className="px-5">
-                <GlassCard padding="32px 20px">
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
-                    <p style={{ fontSize: 32 }}>🔍</p>
-                    <p className="text-secondary">No expenses match these filters</p>
-                    <button className="gd-add-first-btn" onClick={() => setExpenseFilter(EMPTY_FILTER)}>
-                      Clear filters
-                    </button>
-                  </div>
-                </GlassCard>
-              </div>
-            ) : (
-              <div className="px-5" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {visibleExpenses.map(expense => {
-                  const paidByUser = getUserById(expense.paidBy);
-                  const isPaidByMe = expense.paidBy === currentUser.id;
-                  const myEntry = expense.split.entries.find(e => e.userId === currentUser.id);
-                  const myShare = myEntry?.amount ?? 0;
-                  const icon = CATEGORY_ICONS[expense.category];
-                  const menuOpen = expenseMenuId === expense.id;
-
-                  return (
-                    <GlassCard key={expense.id} padding="0" style={{ overflow: 'hidden' }}>
-                      <div className="gd-expense-row" style={{ padding: '14px 16px' }}>
-                        <div className="gd-expense-icon">{icon}</div>
-                        <div className="gd-expense-info">
-                          <span className="gd-expense-desc">{expense.description}</span>
-                          <span className="text-xs text-secondary">
-                            {isPaidByMe ? 'You' : paidByUser?.name} paid {formatCurrency(expense.amount)} · {formatDate(expense.date)}
+                  {visibleExpenses.map(expense => {
+                    const net = round(getNetAmountForUser(expense, currentUser.id));
+                    const menuOpen = expenseMenuId === expense.id;
+                    return (
+                      <div key={expense.id} className="gd-expense" role="rowgroup">
+                        <div className="gd-row" role="row">
+                          <span role="cell" className="num gd-date" title={formatDate(expense.date)}>
+                            {formatLedgerDate(expense.date)}
+                          </span>
+                          <span role="cell" className="gd-desc-cell">
+                            <span className="gd-desc">{expense.description}</span>
+                            <span className="num gd-cat gd-col-wide-inline">{CATEGORY_LABELS[expense.category]}</span>
+                            <span className="text-xs text-secondary gd-meta-mobile">
+                              {nameOf(expense.paidBy)} paid {formatCurrency(expense.amount)}
+                            </span>
+                          </span>
+                          <span role="cell" className="gd-col-wide">{nameOf(expense.paidBy)}</span>
+                          <span role="cell" className="num gd-col-wide gd-right gd-amount">{formatCurrency(expense.amount)}</span>
+                          <span role="cell" className="gd-right gd-share">
+                            <span className={`num ${signClass(net)}`}>{formatSigned(net)}</span>
+                            <span className="gd-share-label">
+                              {net > 0.005 ? 'you lent' : net < -0.005 ? 'you borrowed' : 'not involved'}
+                            </span>
+                          </span>
+                          <span role="cell" className="gd-right">
+                            <button
+                              className={`gd-kebab ${menuOpen ? 'active' : ''}`}
+                              onClick={() => setExpenseMenuId(menuOpen ? null : expense.id)}
+                              aria-label={`Edit or delete ${expense.description}`}
+                              aria-expanded={menuOpen}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                                <circle cx="5" cy="12" r="1.6" />
+                                <circle cx="12" cy="12" r="1.6" />
+                                <circle cx="19" cy="12" r="1.6" />
+                              </svg>
+                            </button>
                           </span>
                         </div>
-                        <div className="gd-expense-balance">
-                          <span className="text-xs text-tertiary" style={{ textTransform: 'uppercase', letterSpacing: 0.3 }}>
-                            {isPaidByMe ? 'you lent' : 'your share'}
-                          </span>
-                          <span className={isPaidByMe ? 'text-green' : 'text-red'} style={{ fontWeight: 600, fontSize: 14 }}>
-                            {isPaidByMe
-                              ? `+${formatCurrency(expense.amount - myShare)}`
-                              : `-${formatCurrency(myShare)}`}
-                          </span>
-                        </div>
-                        {/* Kebab menu button */}
-                        <button
-                          className={`gd-expense-menu-btn ${menuOpen ? 'active' : ''}`}
-                          onClick={() => setExpenseMenuId(menuOpen ? null : expense.id)}
-                          aria-label="Expense actions"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="5" r="1.5" fill="currentColor" />
-                            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-                            <circle cx="12" cy="19" r="1.5" fill="currentColor" />
-                          </svg>
-                        </button>
+
+                        <AnimatePresence>
+                          {menuOpen && (
+                            <motion.div
+                              className="gd-actions"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.16 }}
+                            >
+                              <div className="gd-actions-inner">
+                                <button className="btn btn-secondary btn-sm" onClick={() => openEditExpense(expense)}>
+                                  Edit
+                                </button>
+                                <button className="btn btn-danger btn-sm" onClick={() => handleDeleteExpense(expense.id)}>
+                                  Delete
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
 
-                      {/* Action row */}
-                      <AnimatePresence>
-                        {menuOpen && (
-                          <motion.div
-                            className="gd-expense-actions"
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.18 }}
-                          >
-                            <button
-                              className="gd-action-edit"
-                              onClick={() => openEditExpense(expense)}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                                <path d="M11 4H4C3.44772 4 3 4.44772 3 5V20C3 20.5523 3.44772 21 4 21H19C19.5523 21 20 20.5523 20 19V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M18.5 2.5C19.3284 1.67157 20.6716 1.67157 21.5 2.5C22.3284 3.32843 22.3284 4.67157 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                              Edit
-                            </button>
-                            <div className="gd-action-divider" />
-                            <button
-                              className="gd-action-delete"
-                              onClick={() => handleDeleteExpense(expense.id)}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                                <path d="M3 6H5H21M8 6V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V6M19 6L18.1671 19.1264C18.0723 20.6999 16.7622 22 15.1847 22H8.81535C7.23784 22 5.92769 20.6999 5.83286 19.1264L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                              Delete
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </GlassCard>
-                  );
-                })}
-              </div>
-            )}
-          </motion.div>
-        </motion.div>
+            {/* Balances */}
+            <section className="gd-area-balances" id="balances">
+              <h2 className="gd-h2">Balances</h2>
+              {!hasExpenses ? (
+                <p className="text-sm text-secondary gd-balances-empty">Add an expense to see balances</p>
+              ) : (
+                <div className="ruled">
+                  {group.members.map(m => {
+                    const u = getUserById(m.userId);
+                    if (!u) return null;
+                    const bal = balances[m.userId] ?? 0;
+                    const even = Math.abs(bal) < 0.005;
+                    return (
+                      <button key={m.userId} className="gd-balance" onClick={() => setSelectedMemberId(m.userId)}>
+                        <Avatar user={u} size="sm" />
+                        <span className="gd-balance-info">
+                          <span className="gd-balance-name">{nameOf(m.userId)}</span>
+                          <span className="num gd-balance-meta">
+                            paid {formatCurrency(paidBy[m.userId] ?? 0)} · share {formatCurrency(shareOf[m.userId] ?? 0)}
+                          </span>
+                        </span>
+                        <span className={`gd-balance-amount ${even ? 'zero' : `num ${signClass(bal)}`}`}>
+                          {even ? 'settled up' : formatSigned(bal)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
       </div>
 
-      {/* FAB */}
-      <motion.button
-        className="glass-fab fab-fixed"
-        aria-label="Add expense"
-        onClick={() => { setEditingExpense(null); setShowAddExpense(true); }}
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.35, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number] }}
-        whileTap={{ scale: 0.92 }}
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+      {/* FAB (mobile) */}
+      <button className="glass-fab fab-fixed" aria-label="Add expense" onClick={openAddExpense}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
-      </motion.button>
+      </button>
 
       {/* Add / Edit expense sheet */}
       <AnimatePresence>
@@ -551,13 +485,12 @@ export default function GroupDetail() {
             toUserId={settling.to}
             amount={settling.amount}
             mode="settle"
-            groupLabel={`${group.emoji} ${group.name}`}
+            groupLabel={group.name}
             onClose={() => setSettling(null)}
             onConfirm={handleSettle}
           />
         )}
       </AnimatePresence>
-
     </div>
   );
 }

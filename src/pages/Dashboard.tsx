@@ -1,24 +1,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import GlassCard from '../components/GlassCard';
+import { Link, useNavigate } from 'react-router-dom';
 import Avatar from '../components/Avatar';
+import GroupTile from '../components/GroupTile';
 import AddExpenseSheet from '../components/AddExpenseSheet';
 import AccountMenuSheet from '../components/AccountMenuSheet';
-import { CATEGORY_ICONS } from '../types';
 import { useStore, selectCurrentUser, selectOverallBalance, selectRecentExpenses, selectGroupTotals } from '../store';
-import { formatCurrency, formatDate, getShareForUser } from '../utils';
+import { formatCurrency, formatDate, formatLedgerDate, formatSigned, getNetAmountForUser } from '../utils';
 import './Dashboard.css';
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
-};
 
 type BalanceTab = 'owe' | 'owed';
 
@@ -30,220 +19,209 @@ export default function Dashboard() {
 
   const currentUser = useStore(selectCurrentUser)!;
   const balance = useStore(selectOverallBalance);
-  const recentExpenses = useStore(selectRecentExpenses(4));
+  const recentExpenses = useStore(selectRecentExpenses(5));
   const groups = useStore((s) => s.groups);
   const users = useStore((s) => s.users);
   const groupTotals = useStore(selectGroupTotals);
 
   const getUserById = (id: string) => users.find((u) => u.id === id);
+  const getGroupById = (id?: string) => (id ? groups.find((g) => g.id === id) : undefined);
   const balanceOf = (groupId: string) => groupTotals[groupId]?.yourBalance ?? 0;
-  const isPositive = balance.net >= 0;
+  const settled = Math.abs(balance.net) < 0.005;
+  const isPositive = balance.net > 0;
+  const activeGroups = groups.filter((g) => Math.abs(balanceOf(g.id)) >= 0.005).length;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
+  const rows = activeTab === 'owed' ? balance.owedByFriend : balance.oweToFriend;
+
   return (
     <div className="page-content">
-      <motion.div className="dashboard" variants={containerVariants} initial="hidden" animate="show">
+      <div className="dash">
         {/* Header */}
-        <motion.div className="dashboard-header" variants={itemVariants}>
-          <div className="dashboard-greeting">
-            <div>
-              <p className="greeting-sub text-secondary text-sm">{greeting},</p>
-              <h1 className="greeting-name">{currentUser.name}</h1>
-            </div>
-            <div className="header-actions">
-              <button
-                className="icon-btn dash-avatar-btn"
-                aria-label="Account"
-                onClick={() => setShowAccountMenu(true)}
-              >
-                <Avatar user={currentUser} size="md" showRing />
-              </button>
-            </div>
+        <header className="dash-header">
+          <div>
+            <p className="text-secondary text-sm">{greeting}</p>
+            <h1 className="dash-name">{currentUser.name}</h1>
           </div>
-        </motion.div>
+          <button
+            className="dash-account-btn"
+            aria-label="Account menu"
+            onClick={() => setShowAccountMenu(true)}
+          >
+            <Avatar user={currentUser} size="lg" />
+          </button>
+          <button className="btn btn-primary dash-add-btn" onClick={() => setShowAddExpense(true)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            Add expense
+          </button>
+        </header>
 
-        {/* Net balance hero card */}
-        <motion.div className="px-5 mb-4 dash-balance-hero" variants={itemVariants}>
-          <GlassCard variant="strong" className="balance-hero glass-highlight" padding="24px">
-            <div className="balance-hero-inner">
-              <div>
-                <p className="balance-hero-label">{isPositive ? 'You are owed' : 'You owe'}</p>
-                <motion.p
-                  className={`balance-hero-amount ${isPositive ? 'text-green' : 'text-red'}`}
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.3, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number] }}
+        {/* Overall balance */}
+        <section className="statement dash-statement" aria-label="Overall balance">
+          <div>
+            <span className="cap">
+              {settled ? 'All settled up' : isPositive ? 'Overall, you are owed' : 'Overall, you owe'}
+            </span>
+            <span className={`num dash-net ${settled ? 'zero' : isPositive ? 'pos' : 'neg'}`}>
+              {formatSigned(balance.net)}
+            </span>
+            {activeGroups > 0 && (
+              <span className="text-xs text-secondary">
+                across {activeGroups} {activeGroups === 1 ? 'group' : 'groups'}
+              </span>
+            )}
+          </div>
+          <div className="dash-statement-part">
+            <span className="cap">Owed to you</span>
+            <span className="num pos dash-part-amount">{formatCurrency(balance.totalOwed)}</span>
+          </div>
+          <div className="dash-statement-part">
+            <span className="cap">You owe</span>
+            <span className="num neg dash-part-amount">{formatCurrency(balance.totalOwe)}</span>
+          </div>
+        </section>
+
+        <div className="dash-columns">
+          <div className="dash-main">
+            {/* Who owes whom */}
+            <section>
+              <div className="dash-tabs" role="tablist">
+                <button
+                  role="tab"
+                  aria-selected={activeTab === 'owed'}
+                  className={`dash-tab ${activeTab === 'owed' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('owed')}
                 >
-                  {formatCurrency(Math.abs(balance.net))}
-                </motion.p>
-                <p className="balance-hero-sub text-secondary text-sm">
-                  across {groups.filter((g) => balanceOf(g.id) !== 0).length} groups
-                </p>
+                  Owed to you · {balance.owedByFriend.length}
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={activeTab === 'owe'}
+                  className={`dash-tab ${activeTab === 'owe' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('owe')}
+                >
+                  You owe · {balance.oweToFriend.length}
+                </button>
               </div>
-              <div className="balance-breakdown">
-                <div className="balance-breakdown-item">
-                  <div className="breakdown-dot green" />
-                  <div>
-                    <p className="text-xs text-secondary">Owed to you</p>
-                    <p className="text-green" style={{ fontWeight: 600, fontSize: 15 }}>
-                      {formatCurrency(balance.totalOwed)}
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  role="tabpanel"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {rows.length === 0 ? (
+                    <p className="dash-empty text-secondary">
+                      {activeTab === 'owed' ? 'Nobody owes you right now.' : 'You don’t owe anyone right now.'}
                     </p>
-                  </div>
-                </div>
-                <div className="balance-breakdown-item">
-                  <div className="breakdown-dot red" />
-                  <div>
-                    <p className="text-xs text-secondary">You owe</p>
-                    <p className="text-red" style={{ fontWeight: 600, fontSize: 15 }}>
-                      {formatCurrency(balance.totalOwe)}
-                    </p>
-                  </div>
-                </div>
+                  ) : (
+                    rows.map((b) => {
+                      const friend = getUserById(b.userId);
+                      if (!friend) return null;
+                      return (
+                        <div key={b.userId} className="dash-person">
+                          <Avatar user={friend} size="md" />
+                          <div className="dash-person-info">
+                            <span className="dash-person-name">{friend.name}</span>
+                            <span className="text-xs text-secondary">
+                              {activeTab === 'owed' ? 'owes you' : 'you owe'}
+                            </span>
+                          </div>
+                          <span className={`num ${activeTab === 'owed' ? 'pos' : 'neg'} dash-person-amount`}>
+                            {formatCurrency(b.amount)}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </section>
+
+            {/* Recent expenses */}
+            <section className="dash-recent">
+              <div className="dash-section-head">
+                <h2>Recent expenses</h2>
+                <Link to="/activity" className="dash-link">All activity</Link>
               </div>
-            </div>
-          </GlassCard>
-        </motion.div>
-
-        {/* Balance tabs */}
-        <motion.div className="px-5 mb-4 dash-balance-tabs" variants={itemVariants}>
-          <div className="balance-tabs glass-pill">
-            <button
-              className={`balance-tab ${activeTab === 'owed' ? 'active' : ''}`}
-              onClick={() => setActiveTab('owed')}
-            >
-              Owed to you
-            </button>
-            <button
-              className={`balance-tab ${activeTab === 'owe' ? 'active' : ''}`}
-              onClick={() => setActiveTab('owe')}
-            >
-              You owe
-            </button>
-          </div>
-        </motion.div>
-
-        {/* Balance list */}
-        <motion.div className="px-5 mb-6 dash-balance-list" variants={itemVariants}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="balance-list"
-            >
-              {(activeTab === 'owed' ? balance.owedByFriend : balance.oweToFriend).map((b) => {
-                const friend = getUserById(b.userId);
-                if (!friend) return null;
-                return (
-                  <GlassCard key={b.userId} padding="14px 16px" onClick={() => {}} style={{ marginBottom: 8 }}>
-                    <div className="balance-list-item">
-                      <Avatar user={friend} size="md" />
-                      <div className="balance-list-info">
-                        <span style={{ fontWeight: 500, fontSize: 15 }}>{friend.name}</span>
-                        <span className="text-sm text-secondary">
-                          {activeTab === 'owed' ? 'owes you' : 'you owe'}
+              <div className="ruled">
+                {recentExpenses.map((expense) => {
+                  const paidByUser = getUserById(expense.paidBy);
+                  const isPaidByMe = expense.paidBy === currentUser.id;
+                  const net = getNetAmountForUser(expense, currentUser.id);
+                  const group = getGroupById(expense.groupId);
+                  return (
+                    <div key={expense.id} className="dash-expense">
+                      <span className="num dash-expense-date" title={formatDate(expense.date)}>
+                        {formatLedgerDate(expense.date)}
+                      </span>
+                      <span className="dash-expense-info">
+                        <span className="dash-expense-desc">{expense.description}</span>
+                        <span className="text-xs text-secondary">
+                          {isPaidByMe ? 'You' : paidByUser?.name} paid {formatCurrency(expense.amount)}
                         </span>
-                      </div>
-                      <span
-                        className={activeTab === 'owed' ? 'text-green' : 'text-red'}
-                        style={{ fontWeight: 700, fontSize: 17 }}
-                      >
-                        {activeTab === 'owed' ? '+' : '-'}{formatCurrency(b.amount)}
+                      </span>
+                      <span className="dash-expense-group">{group?.name ?? ''}</span>
+                      <span className={`num dash-expense-share ${net > 0.005 ? 'pos' : net < -0.005 ? 'neg' : 'zero'}`}>
+                        {formatSigned(net)}
                       </span>
                     </div>
-                  </GlassCard>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+
+          {/* Groups */}
+          <aside className="dash-groups">
+            <div className="dash-section-head">
+              <h2>Groups</h2>
+              <Link to="/groups" className="dash-link">All groups</Link>
+            </div>
+            <div className="dash-group-list">
+              {groups.map((group) => {
+                const bal = balanceOf(group.id);
+                const even = Math.abs(bal) < 0.005;
+                return (
+                  <button
+                    key={group.id}
+                    className="dash-group"
+                    onClick={() => navigate(`/groups/${group.id}`)}
+                  >
+                    <GroupTile group={group} size={36} />
+                    <span className="dash-group-info">
+                      <span className="dash-group-name">{group.name}</span>
+                      <span className="dash-group-meta text-xs text-secondary">
+                        {group.members.length} members · active {formatDate(group.lastActivity)}
+                      </span>
+                    </span>
+                    <span className={`${even ? '' : 'num'} dash-group-bal ${even ? 'zero' : bal > 0 ? 'pos' : 'neg'}`}>
+                      {even ? 'settled' : formatSigned(bal)}
+                    </span>
+                  </button>
                 );
               })}
-            </motion.div>
-          </AnimatePresence>
-        </motion.div>
+            </div>
+          </aside>
+        </div>
+      </div>
 
-        {/* Recent expenses */}
-        <motion.div className="dash-recent" variants={itemVariants}>
-          <div className="section-header">
-            <h3>Recent Expenses</h3>
-            <button onClick={() => navigate('/activity')}>See all</button>
-          </div>
-          <GlassCard padding="0" className="dash-recent-card" style={{ marginLeft: 20, marginRight: 20, marginBottom: 24, overflow: 'hidden' }}>
-            {recentExpenses.map((expense, i) => {
-              const paidByUser = getUserById(expense.paidBy);
-              const isPaidByMe = expense.paidBy === currentUser.id;
-              const myShare = getShareForUser(expense, currentUser.id);
-              return (
-                <motion.div
-                  key={expense.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.35 + i * 0.06 }}
-                >
-                  <div className="recent-expense-item" onClick={() => {}}>
-                    <div className="expense-icon-sm">{CATEGORY_ICONS[expense.category]}</div>
-                    <div className="expense-info-sm">
-                      <span className="expense-desc-sm">{expense.description}</span>
-                      <span className="text-xs text-secondary">
-                        {isPaidByMe ? 'You' : paidByUser?.name} · {formatDate(expense.date)}
-                      </span>
-                    </div>
-                    <span className={isPaidByMe ? 'text-green' : 'text-red'} style={{ fontSize: 15, fontWeight: 600 }}>
-                      {isPaidByMe ? '+' : '-'}{formatCurrency(myShare)}
-                    </span>
-                  </div>
-                  {i < recentExpenses.length - 1 && <div className="divider" style={{ marginLeft: 56 }} />}
-                </motion.div>
-              );
-            })}
-          </GlassCard>
-        </motion.div>
-
-        {/* Quick groups */}
-        <motion.div className="dash-groups" variants={itemVariants} style={{ marginBottom: 24 }}>
-          <div className="section-header">
-            <h3>Groups</h3>
-            <button onClick={() => navigate('/groups')}>See all</button>
-          </div>
-          <div className="groups-scroll px-5 dash-groups-scroll">
-            {groups.map((group) => (
-              <GlassCard
-                key={group.id}
-                padding="16px"
-                onClick={() => navigate(`/groups/${group.id}`)}
-                style={{ minWidth: 140, flexShrink: 0 }}
-              >
-                <div className="group-card-mini">
-                  <div className="group-card-emoji" style={{ background: `${group.color}22`, borderColor: `${group.color}44` }}>
-                    {group.emoji}
-                  </div>
-                  <span className="group-card-name">{group.name}</span>
-                  <span
-                    className={`group-card-balance ${balanceOf(group.id) >= 0 ? 'text-green' : 'text-red'}`}
-                    style={{ fontSize: 13, fontWeight: 600 }}
-                  >
-                    {balanceOf(group.id) >= 0 ? '+' : ''}{formatCurrency(balanceOf(group.id))}
-                  </span>
-                </div>
-              </GlassCard>
-            ))}
-          </div>
-        </motion.div>
-      </motion.div>
-
-      {/* FAB */}
-      <motion.button
+      {/* FAB (mobile) */}
+      <button
         className="glass-fab fab-fixed"
         aria-label="Add expense"
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.6, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number] }}
         onClick={() => setShowAddExpense(true)}
-        whileTap={{ scale: 0.92 }}
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
-      </motion.button>
+      </button>
 
       <AnimatePresence>
         {showAddExpense && (

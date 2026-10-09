@@ -74,39 +74,17 @@ export default function App() {
   }, [theme]);
 
   if (!hasOnboarded) {
-    return (
-      <>
-        <div className="app-bg" aria-hidden>
-          <div className="orb-3" />
-          <div className="orb-4" />
-        </div>
-        <Onboarding />
-      </>
-    );
+    return <Onboarding />;
   }
 
   // Data was imported from someone else's export — the person using the app has
   // to say who they are before anything is rendered from a stranger's viewpoint.
   if (needsIdentity) {
-    return (
-      <>
-        <div className="app-bg" aria-hidden>
-          <div className="orb-3" />
-          <div className="orb-4" />
-        </div>
-        <IdentityPicker variant="gate" />
-      </>
-    );
+    return <IdentityPicker variant="gate" />;
   }
 
   return (
     <BrowserRouter>
-      {/* Animated background */}
-      <div className="app-bg" aria-hidden>
-        <div className="orb-3" />
-        <div className="orb-4" />
-      </div>
-
       {/* App shell */}
       <div className="app-shell">
         <SideNav />

@@ -6,9 +6,9 @@ import type { GroupType } from '../types';
 import './Onboarding.css';
 
 const features = [
-  { icon: '💸', title: 'Track shared expenses', body: 'Log any expense and split it any way you like — equally, by amount, or by percentage.' },
-  { icon: '👥', title: 'Settle up with friends', body: 'See exactly who owes what at a glance and record payments when debts are cleared.' },
-  { icon: '📊', title: 'Understand your spending', body: 'Charts and breakdowns show where your money goes across all your groups.' },
+  { title: 'Track shared expenses', body: 'Log any expense and split it any way you like — equally, by amount, or by percentage.' },
+  { title: 'Settle up with friends', body: 'See exactly who owes what at a glance and record payments when debts are cleared.' },
+  { title: 'Understand your spending', body: 'Charts and breakdowns show where your money goes across all your groups.' },
 ];
 
 const GROUP_EMOJIS = ['🏠', '✈️', '🍽️', '🎉', '💼', '🏖️', '🎓', '⚽'];
@@ -110,9 +110,6 @@ export default function Onboarding() {
 
   return (
     <div className="ob-root">
-      {/* Decorative orbs */}
-      <div className="ob-orb ob-orb-1" />
-      <div className="ob-orb ob-orb-2" />
 
       <input
         ref={fileRef}
@@ -144,9 +141,9 @@ export default function Onboarding() {
 
             {/* Feature highlights */}
             <motion.div className="ob-features" variants={item}>
-              {features.map((f) => (
+              {features.map((f, i) => (
                 <div className="ob-feature" key={f.title}>
-                  <span className="ob-feature-icon">{f.icon}</span>
+                  <span className="ob-feature-icon">{String(i + 1).padStart(2, '0')}</span>
                   <div>
                     <p className="ob-feature-title">{f.title}</p>
                     <p className="ob-feature-body">{f.body}</p>
@@ -202,7 +199,7 @@ export default function Onboarding() {
             exit={{ opacity: 0, y: -12, transition: { duration: 0.2 } }}
           >
             <motion.div className="ob-heading" variants={item}>
-              <div className="ob-group-preview" style={{ background: `${color}22`, borderColor: `${color}55` }}>
+              <div className="ob-group-preview" style={{ background: `color-mix(in srgb, ${color} 22%, var(--paper))` }}>
                 {emoji}
               </div>
               <h1 className="ob-title">Create your first group</h1>
@@ -245,9 +242,10 @@ export default function Onboarding() {
                   <button
                     key={c}
                     className={`ob-color-dot ${color === c ? 'active' : ''}`}
-                    style={{ background: c, boxShadow: color === c ? `0 0 0 3px var(--bg-base), 0 0 0 5px ${c}` : 'none' }}
+                    style={{ background: `color-mix(in srgb, ${c} 22%, var(--paper))` }}
                     onClick={() => setColor(c)}
-                    aria-label={c}
+                    aria-label={`Color ${c}`}
+                    aria-pressed={color === c}
                   />
                 ))}
               </div>
@@ -259,6 +257,7 @@ export default function Onboarding() {
                   <button
                     key={t.value}
                     className={`ob-type-chip ${type === t.value ? 'active' : ''}`}
+                    aria-pressed={type === t.value}
                     onClick={() => setType(t.value)}
                   >
                     {t.label}

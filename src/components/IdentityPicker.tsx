@@ -56,9 +56,7 @@ export default function IdentityPicker({ variant, onClose }: Props) {
   };
 
   return (
-    <div className="idp-root">
-      <div className="idp-orb idp-orb-1" />
-      <div className="idp-orb idp-orb-2" />
+    <div className={`idp-root idp-${variant}`}>
 
       <motion.div
         className="idp-card"
@@ -105,7 +103,7 @@ export default function IdentityPicker({ variant, onClose }: Props) {
                     {s.paid === 1 ? 'expense' : 'expenses'}
                   </span>
                 </div>
-                <span className="idp-radio">
+                <span className="idp-radio" aria-hidden>
                   {!addingSelf && selected === u.id && <span className="idp-radio-dot" />}
                 </span>
               </button>

@@ -137,7 +137,8 @@ export default function EditGroupSheet({ open, onClose, group, onDeleted }: Edit
                   <div className="cgs-emoji-btn-wrap" ref={emojiBtnWrapRef}>
                     <button
                       className="cgs-emoji-btn"
-                      style={{ background: `${color}22`, borderColor: `${color}55` }}
+                      style={{ background: `color-mix(in srgb, ${color} 22%, var(--paper))` }}
+                      aria-label="Choose emoji"
                       onClick={() => setShowEmojiInput(v => !v)}
                       title="Choose emoji"
                     >
@@ -178,9 +179,10 @@ export default function EditGroupSheet({ open, onClose, group, onDeleted }: Edit
                     <button
                       key={c}
                       className={`cgs-color-dot ${color === c ? 'active' : ''}`}
-                      style={{ background: c, boxShadow: color === c ? `0 0 0 3px rgba(255,255,255,0.15), 0 0 0 5px ${c}` : 'none' }}
+                      style={{ background: `color-mix(in srgb, ${c} 22%, var(--paper))` }}
+                      aria-pressed={color === c}
                       onClick={() => setColor(c)}
-                      aria-label={c}
+                      aria-label={`Color ${c}`}
                     />
                   ))}
                 </div>

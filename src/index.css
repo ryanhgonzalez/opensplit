@@ -23,11 +23,20 @@ html {
 body {
   height: 100%;
   font-family: var(--font);
-  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
   overflow: hidden;
-  background: var(--bg-base);
+  background: var(--paper);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+input,
+select,
+textarea {
+  font-family: var(--font);
+  color: var(--ink);
 }
 
 #root {
@@ -49,92 +58,13 @@ button {
   color: var(--text-primary);
 }
 
-button:focus-visible {
-  outline: 2px solid var(--accent-blue);
+/* Text fields draw their own focus border and ring; everything else gets an outline. */
+button:focus-visible,
+a:focus-visible,
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
-}
-
-/* Animated mesh gradient background */
-.app-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background: var(--bg-base);
-  overflow: hidden;
-}
-
-.app-bg::before,
-.app-bg::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-}
-
-.app-bg::before {
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, var(--orb-1) 0%, transparent 70%);
-  top: -200px;
-  right: -100px;
-  animation: orb-float-1 18s ease-in-out infinite;
-}
-
-.app-bg::after {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, var(--orb-2) 0%, transparent 70%);
-  bottom: -150px;
-  left: -100px;
-  animation: orb-float-2 22s ease-in-out infinite;
-}
-
-.orb-3 {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, var(--orb-3) 0%, transparent 70%);
-  top: 40%;
-  left: 40%;
-  transform: translate(-50%, -50%);
-  animation: orb-float-3 26s ease-in-out infinite;
-}
-
-.orb-4 {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, var(--orb-4) 0%, transparent 70%);
-  bottom: 20%;
-  right: 10%;
-  animation: orb-float-4 20s ease-in-out infinite;
-}
-
-@keyframes orb-float-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-60px, 80px) scale(1.1); }
-  66% { transform: translate(40px, -40px) scale(0.9); }
-}
-
-@keyframes orb-float-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(80px, -60px) scale(1.15); }
-  66% { transform: translate(-30px, 50px) scale(0.92); }
-}
-
-@keyframes orb-float-3 {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  40% { transform: translate(-55%, -45%) scale(1.1); }
-  70% { transform: translate(-45%, -55%) scale(0.95); }
-}
-
-@keyframes orb-float-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-40px, -60px) scale(1.2); }
 }
 
 /* App shell */
@@ -202,37 +132,248 @@ button:focus-visible {
 }
 
 /* Typography scale */
-h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.15; }
-h2 { font-size: 22px; font-weight: 650; letter-spacing: -0.3px; line-height: 1.2; }
-h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; line-height: 1.3; }
-h4 { font-size: 15px; font-weight: 600; line-height: 1.35; }
+h1 { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+h2 { font-size: 17px; font-weight: 600; letter-spacing: 0; line-height: 1.3; }
+h3 { font-size: 15px; font-weight: 600; line-height: 1.35; }
+h4 { font-size: 14px; font-weight: 600; line-height: 1.35; }
 
 .text-sm { font-size: 13px; }
-.text-xs { font-size: 11px; letter-spacing: 0.2px; }
-.text-secondary { color: var(--text-secondary); }
-.text-tertiary { color: var(--text-tertiary); }
-.text-green { color: var(--accent-green); }
-.text-red { color: var(--accent-red); }
-.text-blue { color: var(--accent-blue); }
+.text-xs { font-size: 12px; }
+.text-secondary { color: var(--muted); }
+.text-tertiary { color: var(--faint); }
+.text-green { color: var(--owed); }
+.text-red { color: var(--owe); }
+.text-blue { color: var(--owed); }
+
+/* ── Ledger primitives ─────────────────────────────────────────────────────── */
+
+/* Every amount of money is set in mono with tabular figures. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Small uppercase caption above a figure or section. */
+.cap {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pos { color: var(--owed); }
+.neg { color: var(--owe); }
+.zero { color: var(--muted); }
+
+/* Section rule: the 2 px ink line that opens a block. */
+.rule-top { border-top: 2px solid var(--ink); }
+
+/* Summary strip: a row of figures under a section rule. */
+.statement {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+}
+
+.statement > * {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.statement > * + * {
+  border-left: 1px solid var(--rule);
+}
+
+.statement > :first-child {
+  padding-left: 0;
+}
+
+/* Ruled list: rows separated by hairlines, opened by a 1 px ink line. */
+.ruled {
+  border-top: 1px solid var(--ink);
+}
+
+.ruled > * {
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--on-ink);
+  border: 0;
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.btn-primary:disabled {
+  background: var(--rule);
+  color: var(--faint);
+}
+
+.btn-secondary {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--panel);
+}
+
+.btn-outline {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  font-weight: 500;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: var(--panel);
+}
+
+.btn-danger {
+  background: var(--paper);
+  color: var(--owe);
+  border: 1px solid var(--owe);
+}
+
+.btn-danger-solid {
+  background: var(--owe);
+  color: #ffffff;
+  border: 0;
+}
+
+.btn-sm {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.btn-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 36px;
+  color: var(--owed);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* Segmented control */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.seg > button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.seg > button + button {
+  border-left: 1px solid var(--border);
+}
+
+.seg > button.active,
+.seg > button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+/* Empty state: a dashed box with a heading, a line of help and maybe an action */
+.empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 28px 20px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.empty-box-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.empty-box .btn {
+  margin-top: 6px;
+}
+
+/* Visually hidden, still read by screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 
 /* Divider */
 .divider {
   height: 1px;
-  background: var(--glass-border);
+  background: var(--rule);
 }
 
 /* Section header */
 .section-header {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   padding: 0 20px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
-.section-header button {
-  color: var(--accent-blue);
-  font-size: 14px;
+.section-header h2,
+.section-header h3 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.section-header button,
+.section-header a {
+  color: var(--owed);
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -261,33 +402,47 @@ h4 { font-size: 15px; font-weight: 600; line-height: 1.35; }
 
 .page-hero-title {
   font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
   line-height: 1.1;
 }
 
 .page-hero-subtitle {
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .page-hero-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 9px 16px;
-  border-radius: var(--radius-full);
-  background: var(--accent-blue-bg);
-  border: 1px solid rgba(96, 165, 250, 0.35);
-  color: var(--accent-blue);
-  font-size: 13px;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  background: var(--ink);
+  border: 0;
+  color: var(--on-ink);
+  font-size: 14px;
   font-weight: 600;
   font-family: var(--font);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: opacity var(--transition-fast);
   white-space: nowrap;
 }
 
 .page-hero-btn:hover {
-  background: rgba(96, 165, 250, 0.2);
+  opacity: 0.88;
+}
+
+@media (min-width: 1024px) {
+  .page-hero-header {
+    padding: 32px 48px 20px;
+    max-width: 1216px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .page-hero-title {
+    font-size: 34px;
+  }
 }

@@ -83,6 +83,8 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
   ).length;
 
   const previewUser = { ...person, name: name || person.name, avatarColor };
+  const settled = Math.abs(balance) < 0.005;
+  const firstName = person.name.split(' ')[0];
 
   return (
     <AnimatePresence>
@@ -96,57 +98,45 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
         >
           <motion.div
             className="sheet-panel ps-panel"
+            role="dialog"
+            aria-label={isSelf ? 'Your profile' : person.name}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+            transition={{ type: 'spring', damping: 32, stiffness: 340 }}
             onClick={e => e.stopPropagation()}
           >
             <div className="sheet-handle" />
             <div className="sheet-header">
-              <span className="sheet-title">{isSelf ? 'Your Profile' : 'Person'}</span>
+              <span className="sheet-title">{isSelf ? 'Your profile' : 'Person'}</span>
               <button className="sheet-close" onClick={onClose} aria-label="Close">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
 
             <div className="sheet-body">
-              {/* Avatar preview */}
-              <div className="ps-avatar-preview">
-                <Avatar user={previewUser} size="xl" showRing={isSelf} />
-                {!isSelf && Math.abs(balance) >= 0.005 && (
-                  <div className={`ps-balance-chip ${balance > 0 ? 'green' : 'red'}`}>
-                    {balance > 0 ? '+' : '-'}{formatCurrency(balance)}
-                    {group ? ` in ${group.emoji} ${group.name}` : ' overall'}
-                  </div>
-                )}
-                {!isSelf && Math.abs(balance) < 0.005 && (
-                  <div className="ps-balance-chip settled">
-                    Settled up{group ? ` in ${group.emoji} ${group.name}` : ''}
-                  </div>
-                )}
-              </div>
-
-              {/* Shared groups (global view only) */}
-              {sharedGroups.length > 0 && (
-                <div className="field-group">
-                  <div className="field-label">Shared groups</div>
-                  <div className="ps-groups-row">
-                    {sharedGroups.map(g => (
-                      <span key={g.id} className="ps-group-chip">
-                        {g.emoji} {g.name}
-                      </span>
-                    ))}
-                  </div>
+              {/* Identity */}
+              <div className="ps-identity">
+                <Avatar user={previewUser} size="xl" />
+                <div className="ps-identity-text">
+                  <span className="ps-name">{name || person.name}</span>
+                  {!isSelf && (
+                    <span className={`ps-balance ${settled ? 'zero' : `num ${balance > 0 ? 'pos' : 'neg'}`}`}>
+                      {settled
+                        ? `Settled up${group ? ` in ${group.name}` : ''}`
+                        : `${balance > 0 ? 'owes you' : 'you owe'} ${formatCurrency(balance)}${group ? ` in ${group.name}` : ' overall'}`}
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
 
               {/* Name */}
               <div className="field-group">
-                <div className="field-label">Name</div>
+                <label className="field-label" htmlFor="ps-name">Name</label>
                 <input
+                  id="ps-name"
                   className="field-input"
                   value={name}
                   onChange={e => setName(e.target.value)}
@@ -154,26 +144,38 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
                 />
               </div>
 
-              {/* Avatar color */}
-              <div className="field-group">
-                <div className="field-label">Color</div>
+              {/* Avatar colour */}
+              <fieldset className="field-group ps-fieldset">
+                <legend className="field-label">Color</legend>
                 <div className="ps-color-row">
                   {AVATAR_COLORS.map(c => (
                     <button
                       key={c}
+                      type="button"
                       className={`ps-color-dot ${avatarColor === c ? 'active' : ''}`}
-                      style={{
-                        background: c,
-                        boxShadow: avatarColor === c
-                          ? `0 0 0 3px rgba(255,255,255,0.15), 0 0 0 5px ${c}`
-                          : 'none',
-                      }}
+                      style={{ background: `color-mix(in srgb, ${c} 22%, var(--paper))` }}
                       onClick={() => setAvatarColor(c)}
-                      aria-label={c}
+                      aria-label={`Color ${c}`}
+                      aria-pressed={avatarColor === c}
                     />
                   ))}
                 </div>
-              </div>
+              </fieldset>
+
+              {/* Shared groups (global view only) */}
+              {sharedGroups.length > 0 && (
+                <div className="field-group">
+                  <div className="field-label">Shared groups</div>
+                  <div className="ruled">
+                    {sharedGroups.map(g => (
+                      <div key={g.id} className="ps-group-row">
+                        <span aria-hidden>{g.emoji}</span>
+                        <span>{g.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Actions (non-self only) */}
               {!isSelf && (
@@ -181,28 +183,12 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
                   {confirmAction === null && (
                     <>
                       {group && (
-                        <button
-                          className="ps-action-btn remove"
-                          onClick={() => setConfirmAction('remove')}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                            <path d="M17 21V19C17 16.7909 15.2091 15 13 15H5C2.79086 15 1 16.7909 1 19V21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            <path d="M23 21V19C23 17.1362 21.7252 15.5701 20 15.126" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8" />
-                            <path d="M17 11C18.6569 11 20 9.65685 20 8C20 6.34315 18.6569 5 17 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            <line x1="22" y1="2" x2="17" y2="7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                          </svg>
-                          Remove from {group.emoji} {group.name}
+                        <button className="btn btn-secondary" onClick={() => setConfirmAction('remove')}>
+                          Remove from {group.name}
                         </button>
                       )}
-                      <button
-                        className="ps-action-btn delete"
-                        onClick={() => setConfirmAction('delete')}
-                      >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                          <path d="M3 6H5H21M8 6V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V6M19 6L18.1671 19.1264C18.0723 20.6999 16.7622 22 15.1847 22H8.81535C7.23784 22 5.92769 20.6999 5.83286 19.1264L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        Delete {person.name.split(' ')[0]} everywhere
+                      <button className="btn btn-danger" onClick={() => setConfirmAction('delete')}>
+                        Delete {firstName} everywhere
                       </button>
                     </>
                   )}
@@ -211,23 +197,25 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
                     {confirmAction === 'remove' && group && (
                       <motion.div
                         className="ps-confirm-box"
+                        role="alertdialog"
                         initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 6 }}
                       >
                         <p className="ps-confirm-text">
-                          Remove <strong>{person.name.split(' ')[0]}</strong> from {group.emoji} {group.name}?
+                          Remove <strong>{firstName}</strong> from {group.name}?
                           Their expenses in this group will remain.
                         </p>
                         <div className="ps-confirm-btns">
-                          <button className="ps-btn-cancel" onClick={() => setConfirmAction(null)}>Cancel</button>
-                          <button className="ps-btn-danger" onClick={handleRemoveFromGroup}>Remove</button>
+                          <button className="btn btn-secondary" onClick={() => setConfirmAction(null)}>Cancel</button>
+                          <button className="btn btn-danger-solid" onClick={handleRemoveFromGroup}>Remove</button>
                         </div>
                       </motion.div>
                     )}
                     {confirmAction === 'delete' && (
                       <motion.div
                         className="ps-confirm-box"
+                        role="alertdialog"
                         initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 6 }}
@@ -237,8 +225,8 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
                           This will also delete {expenseCount} expense{expenseCount !== 1 ? 's' : ''} involving them and cannot be undone.
                         </p>
                         <div className="ps-confirm-btns">
-                          <button className="ps-btn-cancel" onClick={() => setConfirmAction(null)}>Cancel</button>
-                          <button className="ps-btn-danger" onClick={handleDeletePerson}>Delete</button>
+                          <button className="btn btn-secondary" onClick={() => setConfirmAction(null)}>Cancel</button>
+                          <button className="btn btn-danger-solid" onClick={handleDeletePerson}>Delete</button>
                         </div>
                       </motion.div>
                     )}
@@ -249,7 +237,7 @@ export default function PersonSheet({ open, onClose, userId, groupId }: PersonSh
 
             <div className="sheet-footer">
               <button className="sheet-cta" onClick={handleSave} disabled={!name.trim()}>
-                Save Changes
+                Save changes
               </button>
             </div>
           </motion.div>

@@ -444,10 +444,10 @@ export default function AddExpenseSheet({ open, onClose, defaultGroupId, editExp
                     <button
                       key={c}
                       className={`aes-category-btn ${category === c ? 'active' : ''}`}
+                      aria-pressed={category === c}
                       onClick={() => setCategory(c)}
                     >
-                      <span>{CATEGORY_ICONS[c]}</span>
-                      <span className="aes-category-label">{CATEGORY_LABELS[c]}</span>
+                      {CATEGORY_LABELS[c]}
                     </button>
                   ))}
                 </div>

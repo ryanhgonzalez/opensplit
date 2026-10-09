@@ -1,48 +1,59 @@
 .settle-page {
-  padding-bottom: 24px;
-}
-
-@media (min-width: 1024px) {
-  .settle-page {
-    max-width: 900px;
-    margin: 0 auto;
-    padding-left: 8px;
-    padding-right: 8px;
-  }
-}
-
-.settle-summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.settle-summary-pills {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
+  gap: 22px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px 24px;
 }
 
-.settle-pill {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+.settle-statement {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.settle-list {
+.settle-statement > :first-child {
+  grid-column: 1 / -1;
+  padding-bottom: 10px;
+}
+
+.settle-statement > .settle-part {
+  border-left: 0;
+  border-top: 1px solid var(--rule);
+  padding: 10px 0;
+}
+
+.settle-statement > .settle-part + .settle-part {
+  border-left: 1px solid var(--rule);
+  padding-left: 14px;
+}
+
+.settle-net {
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.settle-part-amount {
+  font-weight: 600;
+}
+
+.settle-columns {
   display: flex;
   flex-direction: column;
+  gap: 28px;
+}
+
+.settle-h2 {
+  font-size: 17px;
+  margin-bottom: 8px;
 }
 
 .settle-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  /* Actions drop to a second line rather than squeezing the name on narrow screens. */
   flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 68px;
+  padding: 10px 0;
 }
 
 .settle-info {
@@ -50,72 +61,76 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+}
+
+.settle-name {
+  font-weight: 600;
 }
 
 .settle-amount {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .settle-actions {
   display: flex;
-  align-items: center;
   gap: 6px;
   margin-left: auto;
-  flex-shrink: 0;
 }
 
-/* Remind button */
-.remind-btn {
-  padding: 7px 14px;
-  border-radius: var(--radius-full);
-  font-size: 13px;
-  font-weight: 600;
-  background: rgba(96, 165, 250, 0.12);
-  border: 1px solid rgba(96, 165, 250, 0.3);
-  color: var(--accent-blue);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  font-family: var(--font);
-  flex-shrink: 0;
+.settle-note {
+  max-width: 460px;
 }
 
-.remind-btn:hover {
-  background: rgba(96, 165, 250, 0.2);
+@media (max-width: 420px) {
+  .settle-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
 }
 
-/* Pay / mark-as-paid button */
-.pay-btn {
-  padding: 7px 16px;
-  border-radius: var(--radius-full);
-  font-size: 13px;
-  font-weight: 600;
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.8), rgba(45, 212, 191, 0.7));
-  border: 1px solid rgba(52, 211, 153, 0.3);
-  color: white;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  font-family: var(--font);
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.25);
-}
+@media (min-width: 1024px) {
+  .settle-page {
+    max-width: 1216px;
+    margin: 0 auto;
+    padding: 32px 48px 64px;
+    gap: 28px;
+  }
 
-.pay-btn:hover {
-  box-shadow: 0 6px 18px rgba(52, 211, 153, 0.35);
-}
+  .settle-page .page-hero-title {
+    font-size: 34px;
+  }
 
-/* Settled badge */
-.settled-badge {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: var(--radius-full);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-green);
-  background: rgba(52, 211, 153, 0.1);
-  border: 1px solid rgba(52, 211, 153, 0.25);
-  flex-shrink: 0;
+  .settle-statement {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .settle-statement > :first-child {
+    grid-column: auto;
+    padding: 16px 20px 16px 0;
+  }
+
+  .settle-statement > .settle-part,
+  .settle-statement > .settle-part + .settle-part {
+    border-top: 0;
+    border-left: 1px solid var(--rule);
+    padding: 16px 20px;
+    justify-content: flex-end;
+  }
+
+  .settle-part-amount {
+    font-size: 24px;
+    font-weight: 500;
+  }
+
+  .settle-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 40px;
+    align-items: start;
+  }
+
+  .settle-note {
+    grid-column: 2;
+  }
 }

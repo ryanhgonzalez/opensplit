@@ -84,7 +84,7 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
 
               {/* User header */}
               <div className="ams-header">
-                <Avatar user={currentUser} size="lg" showRing />
+                <Avatar user={currentUser} size="lg" />
                 <div className="ams-header-info">
                   <p className="ams-user-name">{currentUser.name}</p>
                   <p className="text-secondary text-xs">Account</p>
@@ -99,18 +99,18 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
                 <div className="ams-theme-toggle">
                   {(
                     [
-                      { value: 'light' as ThemeMode, label: 'Light', icon: '☀️' },
-                      { value: 'system' as ThemeMode, label: 'System', icon: '⚙️' },
-                      { value: 'dark' as ThemeMode, label: 'Dark', icon: '🌙' },
-                    ] as { value: ThemeMode; label: string; icon: string }[]
-                  ).map(({ value, label, icon }) => (
+                      { value: 'light' as ThemeMode, label: 'Light' },
+                      { value: 'system' as ThemeMode, label: 'System' },
+                      { value: 'dark' as ThemeMode, label: 'Dark' },
+                    ] as { value: ThemeMode; label: string }[]
+                  ).map(({ value, label }) => (
                     <button
                       key={value}
                       className={`ams-theme-opt${theme === value ? ' active' : ''}`}
+                      aria-pressed={theme === value}
                       onClick={() => setTheme(value)}
                     >
-                      <span>{icon}</span>
-                      <span>{label}</span>
+                      {label}
                     </button>
                   ))}
                 </div>

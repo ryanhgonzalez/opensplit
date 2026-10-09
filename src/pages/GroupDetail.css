@@ -1,413 +1,473 @@
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.gd-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.gd-back-btn,
-.gd-add-btn,
-.gd-settings-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+/* Mobile top bar: back · title · settings */
+.gd-topbar {
   display: flex;
   align-items: center;
+  gap: 4px;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 8px 6px 4px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.gd-topbar-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.gd-icon-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  color: var(--text-primary);
-  transition: all var(--transition-fast);
+  border-radius: var(--radius-md);
+  color: var(--ink);
 }
 
-.gd-back-btn:hover,
-.gd-add-btn:hover,
-.gd-settings-btn:hover {
-  background: var(--glass-bg-hover);
+.gd-icon-btn:hover {
+  background: var(--panel);
 }
 
-.gd-add-btn {
-  color: var(--accent-teal);
-  background: rgba(45, 212, 191, 0.1);
-  border-color: rgba(45, 212, 191, 0.25);
-}
-
-/* Summary card */
-.gd-summary-row {
+.gd {
   display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px 20px 24px;
+}
+
+/* Header */
+.gd-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
+  gap: 16px;
 }
 
-.gd-member-strip {
+.gd-title-block {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gd-crumb {
+  display: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.gd-crumb:hover {
+  color: var(--ink);
+}
+
+.gd-title-row {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+
+.gd-title {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.gd-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.gd-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 8px 0 0;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.gd-member:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.gd-header-actions {
+  display: none;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-.gd-member-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+/* Statement */
+.gd-statement {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.gd-member-chip-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-md);
-  transition: background var(--transition-fast);
+.gd-statement-extra {
+  display: none !important;
 }
 
-.gd-member-chip-btn:hover {
-  background: var(--glass-bg-hover);
-}
-
-/* Balance rows */
-.gd-balance-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-}
-
-.gd-balance-name {
-  flex: 1;
-  font-size: 15px;
+.gd-figure {
+  font-size: 20px;
   font-weight: 500;
 }
 
-.gd-balance-amount {
-  font-size: 15px;
-  font-weight: 700;
+.gd-figure-strong {
+  font-weight: 600;
 }
 
-/* Settlement rows */
-.gd-settlement-row {
+/* Grid of sections: mobile order is settle → payments → expenses → balances */
+.gd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'settle'
+    'payments'
+    'expenses'
+    'balances';
+  gap: 28px;
+}
+
+.gd-area-settle { grid-area: settle; }
+.gd-area-payments { grid-area: payments; }
+.gd-area-expenses { grid-area: expenses; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.gd-area-balances { grid-area: balances; }
+
+.gd-h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.gd-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.gd-section-head .gd-h2 {
+  margin-bottom: 0;
+}
+
+/* To settle */
+.gd-transfer {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  /* The settle action wraps below rather than crushing the row on narrow screens. */
-  flex-wrap: wrap;
+  min-height: 56px;
 }
 
-.gd-settlement-info {
-  flex: 1 1 90px;
+.gd-transfer-text {
+  flex: 1;
   min-width: 0;
 }
 
-.gd-settle-btn {
-  margin-left: auto;
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  font-family: var(--font);
-  font-size: 12px;
+.gd-transfer-text strong,
+.gd-payment-info strong {
+  font-weight: 500;
+}
+
+.gd-transfer-amount {
   font-weight: 600;
-  color: white;
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.8), rgba(45, 212, 191, 0.7));
-  border: 1px solid rgba(52, 211, 153, 0.3);
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.22);
-  transition: box-shadow var(--transition-fast);
 }
 
-.gd-settle-btn:hover {
-  box-shadow: 0 6px 18px rgba(52, 211, 153, 0.32);
-}
-
-/* Completed payment rows */
-.gd-payment-row {
+/* Completed payments */
+.gd-payment {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  flex-wrap: wrap;
-}
-
-.gd-payment-check {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--accent-green);
-  background: var(--accent-green-bg);
-  border: 1px solid rgba(52, 211, 153, 0.28);
+  min-height: 56px;
 }
 
 .gd-payment-info {
-  flex: 1 1 110px;
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
-.gd-payment-title {
-  font-size: 14px;
-  font-weight: 600;
+.gd-payment-meta {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .gd-payment-amount {
-  font-size: 15px;
-  font-weight: 700;
-  margin-left: auto;
-}
-
-.gd-payment-undo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--fill-primary);
-  border: 1px solid var(--glass-border);
-  color: var(--text-secondary);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all var(--transition-fast);
-}
-
-.gd-payment-undo:hover {
-  background: var(--fill-hover);
-  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .gd-payment-confirm {
-  display: flex;
-  align-items: center;
+  display: inline-flex;
   gap: 6px;
-  flex-shrink: 0;
 }
 
-.gd-payment-cancel,
-.gd-payment-undo-confirm {
-  padding: 5px 12px;
-  border-radius: var(--radius-full);
-  font-family: var(--font);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
+.gd-undo {
+  min-height: 36px;
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--owe);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.gd-payment-cancel {
-  background: var(--fill-primary);
-  border: 1px solid var(--glass-border);
-  color: var(--text-secondary);
-}
-
-.gd-payment-cancel:hover {
-  background: var(--fill-hover);
-}
-
-.gd-payment-undo-confirm {
-  background: var(--accent-red-bg);
-  border: 1px solid rgba(255, 69, 58, 0.3);
-  color: var(--accent-red);
-}
-
-.gd-payment-undo-confirm:hover {
-  background: rgba(255, 69, 58, 0.22);
-}
-
-/* Expense rows */
-.gd-expense-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.gd-expense-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  flex-shrink: 0;
-}
-
-.gd-expense-info {
-  flex: 1;
+/* Expenses table */
+.gd-table {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+}
+
+.gd-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 32px;
+  align-items: center;
+  gap: 10px;
+}
+
+.gd-row-head {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.gd-row-head > :nth-child(2) {
+  visibility: hidden;
+}
+
+.gd-expense {
+  border-bottom: 1px solid var(--rule);
+}
+
+.gd-expense > .gd-row {
+  min-height: 60px;
+  padding: 8px 0;
+}
+
+.gd-col-wide,
+.gd-col-wide-inline {
+  display: none;
+}
+
+.gd-right {
+  text-align: right;
+}
+
+.gd-date {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.gd-desc-cell {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 
-.gd-expense-desc {
-  font-size: 14px;
+.gd-desc {
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.gd-expense-balance {
+.gd-cat {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gd-share {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
 }
 
-/* Expense kebab menu */
-.gd-expense-menu-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  display: flex;
+.gd-share > .num {
+  font-weight: 600;
+}
+
+.gd-share-label {
+  display: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.gd-amount {
+  font-weight: 500;
+}
+
+.gd-kebab {
+  width: 32px;
+  height: 44px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: none;
-  border: 1px solid transparent;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all var(--transition-fast);
+  border-radius: var(--radius-md);
+  color: var(--muted);
 }
 
-.gd-expense-menu-btn:hover,
-.gd-expense-menu-btn.active {
-  background: var(--glass-bg);
-  border-color: var(--glass-border);
-  color: var(--text-primary);
+.gd-kebab:hover,
+.gd-kebab.active {
+  color: var(--ink);
+  background: var(--panel);
 }
 
-.gd-expense-actions {
-  display: flex;
-  align-items: center;
-  border-top: 1px solid var(--glass-border);
+.gd-actions {
   overflow: hidden;
 }
 
-.gd-action-edit,
-.gd-action-delete {
-  flex: 1;
+.gd-actions-inner {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 0 12px;
+}
+
+/* Balances */
+.gd-balance {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 0;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: var(--font);
-  cursor: pointer;
-  border: none;
+  gap: 12px;
+  width: 100%;
+  min-height: 54px;
+  padding: 0;
   background: none;
-  transition: background var(--transition-fast);
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  color: var(--ink);
 }
 
-.gd-action-edit {
-  color: var(--accent-blue);
+.gd-balance:hover .gd-balance-name {
+  text-decoration: underline;
 }
 
-.gd-action-edit:hover {
-  background: rgba(96, 165, 250, 0.08);
+.gd-balance-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.gd-action-delete {
-  color: var(--accent-red);
+.gd-balance-name {
+  font-weight: 500;
 }
 
-.gd-action-delete:hover {
-  background: rgba(248, 113, 113, 0.08);
+.gd-balance-meta {
+  font-size: 11px;
+  color: var(--muted);
 }
 
-.gd-action-divider {
-  width: 1px;
-  height: 28px;
-  background: var(--glass-border);
-}
-
-/* Desktop: 2-panel layout */
-@media (min-width: 1024px) {
-  .gd-page-body {
-    display: grid;
-    grid-template-columns: 2fr 3fr;
-    column-gap: 28px;
-    padding: 20px 28px 48px;
-    align-items: start;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-
-  /* Left panel: summary, balances, settlements — auto-stacked in column 1 */
-  .gd-section-summary {
-    grid-column: 1;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    padding-top: 0 !important;
-  }
-
-  .gd-section-balances {
-    grid-column: 1;
-    margin-bottom: 20px !important;
-  }
-
-  .gd-section-balances .px-5,
-  .gd-section-settlements .px-5,
-  .gd-section-payments .px-5 {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-
-  .gd-section-settlements {
-    grid-column: 1;
-    margin-bottom: 20px !important;
-  }
-
-  .gd-section-payments {
-    grid-column: 1;
-    margin-bottom: 0 !important;
-  }
-
-  /* Remove extra horizontal padding from section headers within panels */
-  .gd-page-body .section-header {
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  /* Right panel: expenses fill full height of right column */
-  .gd-section-expenses {
-    grid-column: 2;
-    grid-row: 1 / 10;
-    margin-bottom: 0 !important;
-  }
-
-  .gd-section-expenses .px-5 {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-}
-
-/* Empty state CTA */
-.gd-add-first-btn {
-  margin-top: 4px;
-  padding: 10px 20px;
-  border-radius: var(--radius-full);
-  background: rgba(96, 165, 250, 0.15);
-  border: 1px solid rgba(96, 165, 250, 0.35);
-  color: var(--accent-blue);
-  font-size: 14px;
+.gd-balance-amount {
   font-weight: 600;
-  cursor: pointer;
-  font-family: var(--font);
-  transition: all var(--transition-fast);
 }
 
-.gd-add-first-btn:hover {
-  background: rgba(96, 165, 250, 0.22);
+.gd-balances-empty {
+  padding: 12px 0;
+  border-top: 1px solid var(--ink);
+}
+
+/* ── Desktop ───────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .gd-topbar {
+    display: none;
+  }
+
+  .gd {
+    max-width: 1216px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 32px 48px 64px;
+    gap: 28px;
+  }
+
+  .gd-crumb {
+    display: block;
+  }
+
+  .gd-title {
+    font-size: 34px;
+  }
+
+  .gd-header-actions {
+    display: flex;
+  }
+
+  .gd-statement {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .gd-statement-extra {
+    display: flex !important;
+  }
+
+  .gd-figure {
+    font-size: 26px;
+  }
+
+  .gd-grid {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas:
+      'expenses balances'
+      'expenses settle'
+      'expenses payments'
+      'expenses .';
+    grid-template-rows: auto auto auto 1fr;
+    column-gap: 40px;
+    row-gap: 32px;
+    align-items: start;
+  }
+
+  .gd-h2 {
+    font-size: 17px;
+  }
+
+  .gd-row {
+    grid-template-columns: 56px minmax(0, 1fr) 72px 92px 104px 36px;
+    gap: 10px;
+  }
+
+  .gd-desc {
+    white-space: normal;
+  }
+
+  .gd-row-head > :nth-child(2) {
+    visibility: visible;
+  }
+
+  .gd-col-wide {
+    display: block;
+  }
+
+  .gd-col-wide-inline {
+    display: inline;
+  }
+
+  .gd-meta-mobile {
+    display: none;
+  }
+
+  .gd-share-label {
+    display: block;
+  }
+
+  .gd-date {
+    font-size: 12px;
+  }
+
+  .gd-actions-inner {
+    padding-right: 36px;
+  }
 }

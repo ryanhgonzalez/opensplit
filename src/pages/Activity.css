@@ -1,176 +1,103 @@
 .activity-page {
-  padding-bottom: 24px;
-}
-
-/* Filter chips */
-.filter-row {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 18px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px 24px;
 }
 
-.filter-chip {
-  padding: 8px 18px;
-  border-radius: var(--radius-full);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: var(--glass-blur-light);
-  -webkit-backdrop-filter: var(--glass-blur-light);
-  cursor: pointer;
-  transition: all var(--transition-base);
-  font-family: var(--font);
+.activity-count {
+  margin-top: 4px;
 }
 
-.filter-chip.active {
-  background: rgba(45, 212, 191, 0.15);
-  border-color: rgba(45, 212, 191, 0.35);
-  color: var(--accent-teal);
+.activity-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.activity-tab {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.activity-tab.active {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
   font-weight: 600;
 }
 
-/* Activity group */
-.activity-group {
-  margin-bottom: 8px;
-}
-
-.activity-date-label {
+.activity-day {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  flex-direction: column;
 }
 
-.activity-date-label span {
+.activity-day-label {
+  padding: 8px 0;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  white-space: nowrap;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--ink);
 }
 
-.activity-date-line {
-  flex: 1;
-  height: 1px;
-  background: var(--glass-border);
-}
-
-/* Activity item */
-.activity-item {
+.activity-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  min-height: 64px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
 }
 
-.activity-avatar-wrap {
-  position: relative;
+.activity-kind {
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
-}
-
-.activity-type-dot {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
+  border-radius: var(--radius-md);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid var(--bg-base);
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.activity-type-dot.green {
-  background: var(--accent-green);
-}
-
-.activity-type-dot.red {
-  background: var(--accent-red);
-}
+.k-exp { background: var(--panel); color: var(--ink); }
+.k-pay { background: var(--owed-tint); color: var(--owed); }
+.k-del { background: var(--owe-tint); color: var(--owe); }
 
 .activity-content {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-}
-
-.activity-description {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  line-height: 1.3;
-}
-
-.activity-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.activity-group-tag {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  border: 1px solid;
 }
 
 .activity-amount {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
   flex-shrink: 0;
 }
 
-.activity-amount span:first-child {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-}
-
-.activity-badge {
-  font-size: 10px;
+.activity-amount .num {
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
-.activity-badge.settled {
-  background: rgba(52, 211, 153, 0.12);
-  color: var(--accent-green);
-  border: 1px solid rgba(52, 211, 153, 0.25);
-}
-
-.activity-badge.expense {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text-secondary);
-  border: 1px solid var(--glass-border);
-}
-
-/* Empty state */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 60px 20px;
-  text-align: center;
-}
-
-/* Desktop: constrain to a readable width */
 @media (min-width: 1024px) {
   .activity-page {
-    max-width: 900px;
+    max-width: 860px;
     margin: 0 auto;
-    padding-left: 8px;
-    padding-right: 8px;
+    padding: 32px 48px 64px;
+    gap: 22px;
+  }
+
+  .activity-page .page-hero-title {
+    font-size: 34px;
   }
 }

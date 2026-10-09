@@ -1,65 +1,65 @@
 .egs-danger-zone {
   margin-top: 8px;
-  padding: 16px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(248, 113, 113, 0.2);
-  background: rgba(248, 113, 113, 0.05);
 }
 
 .egs-delete-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  color: var(--accent-red);
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--owe);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  color: var(--owe);
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--font);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  opacity: 0.85;
-  transition: opacity var(--transition-fast);
 }
 
-.egs-delete-btn:hover { opacity: 1; }
+.egs-delete-btn:hover {
+  background: var(--owe-tint);
+}
 
 .egs-confirm-row {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--owe);
+  border-radius: var(--radius-md);
+  background: var(--owe-tint);
+}
+
+.egs-confirm-row > div {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .egs-confirm-text {
-  font-size: 13px;
-  color: var(--accent-red);
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .egs-cancel-btn,
 .egs-confirm-delete-btn {
-  flex: 1;
-  padding: 10px;
+  min-height: 44px;
   border-radius: var(--radius-md);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  font-family: var(--font);
-  cursor: pointer;
-  transition: all var(--transition-fast);
 }
 
 .egs-cancel-btn {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  color: var(--text-primary);
+  border: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .egs-confirm-delete-btn {
-  background: rgba(248, 113, 113, 0.2);
-  border: 1px solid rgba(248, 113, 113, 0.4);
-  color: var(--accent-red);
-}
-
-.egs-confirm-delete-btn:hover {
-  background: rgba(248, 113, 113, 0.3);
+  border: 0;
+  background: var(--owe);
+  color: #ffffff;
 }

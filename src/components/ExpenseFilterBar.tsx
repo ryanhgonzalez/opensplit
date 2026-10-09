@@ -39,7 +39,7 @@ export default function ExpenseFilterBar({
 
   return (
     <div className="exf">
-      <div className="exf-search glass-sm">
+      <div className="exf-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0 }}>
           <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.8" />
           <path d="M21 21L16.65 16.65" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -99,7 +99,7 @@ export default function ExpenseFilterBar({
                 <input
                   id={fromId}
                   type="date"
-                  className="exf-date-input glass-sm"
+                  className="exf-date-input"
                   value={value.from ?? ''}
                   max={value.to || undefined}
                   onChange={(e) => patch({ from: e.target.value || undefined })}
@@ -110,7 +110,7 @@ export default function ExpenseFilterBar({
                 <input
                   id={toId}
                   type="date"
-                  className="exf-date-input glass-sm"
+                  className="exf-date-input"
                   value={value.to ?? ''}
                   min={value.from || undefined}
                   onChange={(e) => patch({ to: e.target.value || undefined })}

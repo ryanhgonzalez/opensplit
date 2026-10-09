@@ -1,22 +1,11 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import GlassCard from '../components/GlassCard';
+import { AnimatePresence } from 'framer-motion';
 import Avatar from '../components/Avatar';
 import SettleModal, { SettleMode } from '../components/SettleModal';
 import { useStore, selectCurrentUser, selectOverallBalance } from '../store';
-import { formatCurrency } from '../utils';
+import { formatCurrency, formatSigned } from '../utils';
 import type { PaymentMethod } from '../types';
 import './SettleUp.css';
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
-};
 
 interface ActiveModal {
   fromUserId: string;
@@ -57,134 +46,122 @@ export default function SettleUp() {
     });
   };
 
+  const settled = balance.owedByFriend.length === 0 && balance.oweToFriend.length === 0;
+  const netEven = Math.abs(balance.net) < 0.005;
+
   return (
     <div className="page-content">
-      <motion.div className="settle-page" variants={containerVariants} initial="hidden" animate="show">
-        {/* Page hero header */}
-        <motion.div className="page-hero-header" variants={itemVariants}>
+      <div className="settle-page">
+        <h1 className="page-hero-title">Settle Up</h1>
+
+        <section className="statement settle-statement" aria-label="Overall balance">
           <div>
-            <h1 className="page-hero-title">Settle Up</h1>
-            <p className="page-hero-subtitle text-secondary text-sm">
-              {balance.net >= 0 ? 'You are owed overall' : 'You owe overall'}
-            </p>
+            <span className="cap">Overall net balance</span>
+            <span className={`num settle-net ${netEven ? 'zero' : balance.net > 0 ? 'pos' : 'neg'}`}>
+              {formatSigned(balance.net)}
+            </span>
+            {!netEven && (
+              <span className="text-sm text-secondary">
+                {balance.net > 0 ? 'You are owed overall' : 'You owe overall'}
+              </span>
+            )}
           </div>
-        </motion.div>
+          <div className="settle-part">
+            <span className="cap">Owed to you</span>
+            <span className="num pos settle-part-amount">{formatCurrency(balance.totalOwed)}</span>
+          </div>
+          <div className="settle-part">
+            <span className="cap">You owe</span>
+            <span className="num neg settle-part-amount">{formatCurrency(balance.totalOwe)}</span>
+          </div>
+        </section>
 
-        {/* Net summary */}
-        <motion.div className="px-5 mb-5" variants={itemVariants}>
-            <GlassCard variant="strong" className="glass-highlight" padding="20px">
-              <div className="settle-summary">
-                <div>
-                  <p className="text-secondary text-sm">Overall net balance</p>
-                  <p
-                    className={balance.net >= 0 ? 'text-green' : 'text-red'}
-                    style={{ fontSize: 32, fontWeight: 800, letterSpacing: -1.5, marginTop: 4 }}
-                  >
-                    {balance.net >= 0 ? '+' : '-'}{formatCurrency(Math.abs(balance.net))}
-                  </p>
-                </div>
-                <div className="settle-summary-pills">
-                  <div className="settle-pill">
-                    <span className="text-xs text-secondary">Owed to you</span>
-                    <span className="text-green" style={{ fontWeight: 700 }}>{formatCurrency(balance.totalOwed)}</span>
-                  </div>
-                  <div className="settle-pill">
-                    <span className="text-xs text-secondary">You owe</span>
-                    <span className="text-red" style={{ fontWeight: 700 }}>{formatCurrency(balance.totalOwe)}</span>
-                  </div>
-                </div>
-              </div>
-            </GlassCard>
-          </motion.div>
-
-          {/* You are owed */}
-          {balance.owedByFriend.length > 0 && (
-            <motion.div variants={itemVariants} className="mb-5">
-              <div className="section-header"><h3>Owed to You</h3></div>
-              <div className="px-5 settle-list">
-                {balance.owedByFriend.map((b) => {
-                  const friend = getUserById(b.userId);
-                  if (!friend) return null;
-                  return (
-                    <GlassCard key={b.userId} padding="16px" style={{ marginBottom: 10 }}>
-                      <div className="settle-row">
+        {settled ? (
+          <div className="empty-box">
+            <span className="empty-box-title">All settled up!</span>
+            <span className="text-secondary">Nobody owes anybody right now.</span>
+          </div>
+        ) : (
+          <div className="settle-columns">
+            {balance.owedByFriend.length > 0 && (
+              <section className="settle-col">
+                <h2 className="settle-h2">Owed to you</h2>
+                <div className="ruled">
+                  {balance.owedByFriend.map((b) => {
+                    const friend = getUserById(b.userId);
+                    if (!friend) return null;
+                    return (
+                      <div key={b.userId} className="settle-row">
                         <Avatar user={friend} size="md" />
-                        <div className="settle-info">
-                          <span style={{ fontWeight: 500, fontSize: 15 }}>{friend.name}</span>
-                          <span className="text-sm text-secondary">owes you</span>
-                        </div>
-                        <span className="text-green settle-amount">+{formatCurrency(b.amount)}</span>
-                        <div className="settle-actions">
-                          <motion.button
-                            className="remind-btn"
-                            whileTap={{ scale: 0.95 }}
+                        <span className="settle-info">
+                          <span className="settle-name">{friend.name}</span>
+                          <span className="text-xs text-secondary">owes you</span>
+                        </span>
+                        <span className="num pos settle-amount">{formatCurrency(b.amount)}</span>
+                        <span className="settle-actions">
+                          <button
+                            className="btn btn-secondary btn-sm"
                             onClick={() => setActiveModal({
                               fromUserId: b.userId, toUserId: currentUser.id, amount: b.amount, mode: 'remind',
                             })}
                           >
                             Remind
-                          </motion.button>
-                          <motion.button
-                            className="pay-btn"
-                            whileTap={{ scale: 0.95 }}
+                          </button>
+                          <button
+                            className="btn btn-primary btn-sm"
                             onClick={() => setActiveModal({
                               fromUserId: b.userId, toUserId: currentUser.id, amount: b.amount, mode: 'settle',
                             })}
                           >
-                            Mark Paid
-                          </motion.button>
-                        </div>
+                            Mark received
+                          </button>
+                        </span>
                       </div>
-                    </GlassCard>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
-          {/* You owe */}
-          {balance.oweToFriend.length > 0 && (
-            <motion.div variants={itemVariants} className="mb-5">
-              <div className="section-header"><h3>You Owe</h3></div>
-              <div className="px-5 settle-list">
-                {balance.oweToFriend.map((b) => {
-                  const friend = getUserById(b.userId);
-                  if (!friend) return null;
-                  return (
-                    <GlassCard key={b.userId} padding="16px" style={{ marginBottom: 10 }}>
-                      <div className="settle-row">
+            {balance.oweToFriend.length > 0 && (
+              <section className="settle-col">
+                <h2 className="settle-h2">You owe</h2>
+                <div className="ruled">
+                  {balance.oweToFriend.map((b) => {
+                    const friend = getUserById(b.userId);
+                    if (!friend) return null;
+                    return (
+                      <div key={b.userId} className="settle-row">
                         <Avatar user={friend} size="md" />
-                        <div className="settle-info">
-                          <span style={{ fontWeight: 500, fontSize: 15 }}>{friend.name}</span>
-                          <span className="text-sm text-secondary">you owe</span>
-                        </div>
-                        <span className="text-red settle-amount">-{formatCurrency(b.amount)}</span>
-                        <div className="settle-actions">
-                          <motion.button
-                            className="pay-btn"
-                            whileTap={{ scale: 0.95 }}
+                        <span className="settle-info">
+                          <span className="settle-name">{friend.name}</span>
+                          <span className="text-xs text-secondary">you owe</span>
+                        </span>
+                        <span className="num neg settle-amount">{formatCurrency(b.amount)}</span>
+                        <span className="settle-actions">
+                          <button
+                            className="btn btn-primary btn-sm"
                             onClick={() => setActiveModal({
                               fromUserId: currentUser.id, toUserId: b.userId, amount: b.amount, mode: 'settle',
                             })}
                           >
                             Pay
-                          </motion.button>
-                        </div>
+                          </button>
+                        </span>
                       </div>
-                    </GlassCard>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
-          {balance.owedByFriend.length === 0 && balance.oweToFriend.length === 0 && (
-            <motion.div variants={itemVariants} className="empty-state" style={{ padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <p style={{ fontSize: 40 }}>🎉</p>
-              <p className="text-secondary">All settled up!</p>
-            </motion.div>
-          )}
-      </motion.div>
+            <p className="text-sm text-secondary settle-note">
+              Payments marked here clear your overall balance with that person. To clear one group’s
+              balance, mark it from inside that group.
+            </p>
+          </div>
+        )}
+      </div>
 
       <AnimatePresence>
         {activeModal && (
