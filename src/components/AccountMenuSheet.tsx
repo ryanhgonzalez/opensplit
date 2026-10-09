@@ -16,6 +16,7 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
   const users = useStore((s) => s.users);
   const groups = useStore((s) => s.groups);
   const allExpenses = useStore((s) => s.expenses);
+  const allSettlements = useStore((s) => s.settlements);
 
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
@@ -53,8 +54,10 @@ export default function AccountMenuSheet({ open, onClose }: Props) {
     try {
       const group = groups.find((g) => g.id === groupId)!;
       const expenses = allExpenses.filter((e) => e.groupId === groupId);
+      // Completed payments change who still owes what; the report must apply them.
+      const payments = allSettlements.filter((s) => s.groupId === groupId);
       const { generateGroupReport } = await import('../lib/groupReport');
-      generateGroupReport(group, expenses, users);
+      await generateGroupReport(group, expenses, users, payments);
     } finally {
       setPdfLoadingId(null);
     }
