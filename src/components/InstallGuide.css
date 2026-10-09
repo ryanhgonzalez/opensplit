@@ -1,0 +1,110 @@
+/* Full-screen install guide, shown over everything (onboarding included). */
+.ig-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  background: var(--paper);
+  color: var(--ink);
+  padding: max(32px, env(safe-area-inset-top, 32px)) 24px max(28px, env(safe-area-inset-bottom, 28px));
+}
+
+.ig-card {
+  width: 100%;
+  max-width: 420px;
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.ig-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--rule);
+}
+
+.ig-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.ig-title {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.ig-lede {
+  color: var(--muted);
+}
+
+.ig-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  margin-top: -10px;
+}
+
+.ig-step {
+  display: flex;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+  line-height: 1.6;
+}
+
+.ig-step-num {
+  min-width: 22px;
+  padding-top: 1px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* An inline replica of the browser control the step refers to. */
+.ig-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 7px;
+  margin: 0 1px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  font-weight: 500;
+  vertical-align: -3px;
+  white-space: nowrap;
+}
+
+.ig-cta {
+  width: 100%;
+  min-height: 52px;
+  font-size: 15px;
+}
+
+.ig-warning {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--owe-tint);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ig-continue {
+  align-self: center;
+  min-height: 44px;
+  padding: 0 12px;
+  color: var(--owed);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

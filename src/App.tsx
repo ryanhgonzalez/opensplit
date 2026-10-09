@@ -13,6 +13,7 @@ import Insights from './pages/Insights';
 import People from './pages/People';
 import Onboarding from './pages/Onboarding';
 import IdentityPicker from './components/IdentityPicker';
+import InstallGuide from './components/InstallGuide';
 
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
@@ -73,14 +74,25 @@ export default function App() {
     }
   }, [theme]);
 
+  // The install guide sits on top of whichever screen is showing.
   if (!hasOnboarded) {
-    return <Onboarding />;
+    return (
+      <>
+        <Onboarding />
+        <InstallGuide />
+      </>
+    );
   }
 
   // Data was imported from someone else's export — the person using the app has
   // to say who they are before anything is rendered from a stranger's viewpoint.
   if (needsIdentity) {
-    return <IdentityPicker variant="gate" />;
+    return (
+      <>
+        <IdentityPicker variant="gate" />
+        <InstallGuide />
+      </>
+    );
   }
 
   return (
@@ -93,6 +105,7 @@ export default function App() {
           <BottomNav />
         </div>
       </div>
+      <InstallGuide />
     </BrowserRouter>
   );
 }
