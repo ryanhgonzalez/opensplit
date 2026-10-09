@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>OpenSplit</title>
+  <!-- Ledger page: a heading rule over three rows, each ending in an amount owed (blue) or owing (orange). -->
+  <rect width="512" height="512" fill="#F6F6F3"/>
+  <rect x="112" y="136" width="288" height="36" fill="#15171C"/>
+  <rect x="112" y="234" width="178" height="14" fill="#15171C"/>
+  <rect x="314" y="225" width="86" height="32" fill="#1D47C9"/>
+  <rect x="112" y="306" width="178" height="14" fill="#15171C"/>
+  <rect x="314" y="297" width="86" height="32" fill="#B4410F"/>
+  <rect x="112" y="378" width="178" height="14" fill="#15171C"/>
+  <rect x="314" y="369" width="86" height="32" fill="#1D47C9"/>
+</svg>
